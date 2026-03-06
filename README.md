@@ -6,6 +6,7 @@ A music distribution platform built with React and Vite, deployed on Vercel.
 
 - Artist dashboard for managing releases
 - Admin dashboard for overseeing distributions
+- File upload for music releases
 - Demo data for testing
 - Backend integration with Supabase
 
@@ -23,6 +24,15 @@ A music distribution platform built with React and Vite, deployed on Vercel.
 3. Update `src/supabase.js` with your URL and key
 4. Run the SQL in `supabase-setup.sql` in your Supabase SQL editor
 5. For demo users, they use local data; for real users, sign up via Supabase auth
+
+## File Upload
+
+Artists can upload music files through the dashboard:
+- Go to Releases tab
+- Click "+ Upload New"
+- Fill in title, type, genre
+- Select audio file (MP3, WAV, etc.)
+- Files are stored securely in Supabase Storage
 
 ## Deployment
 
