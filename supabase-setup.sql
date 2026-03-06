@@ -27,7 +27,8 @@ CREATE TABLE releases (
   genre TEXT,
   earnings INTEGER DEFAULT 0,
   streams INTEGER DEFAULT 0,
-  dists JSONB DEFAULT '[]'
+  dists JSONB DEFAULT '[]',
+  file_url TEXT
 );
 
 -- Payouts table
@@ -39,6 +40,15 @@ CREATE TABLE payouts (
   at TEXT NOT NULL,
   method TEXT NOT NULL
 );
+
+-- Create storage bucket for music files
+INSERT INTO storage.buckets (id, name, public) VALUES ('music-files', 'music-files', false);
+
+-- Storage policies
+CREATE POLICY "Artists can upload own files" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'music-files' AND auth.uid()::text = (storage.foldername(name))[1]);
+CREATE POLICY "Artists can view own files" ON storage.objects FOR SELECT USING (bucket_id = 'music-files' AND auth.uid()::text = (storage.foldername(name))[1]);
+CREATE POLICY "Artists can update own files" ON storage.objects FOR UPDATE USING (bucket_id = 'music-files' AND auth.uid()::text = (storage.foldername(name))[1]);
+CREATE POLICY "Artists can delete own files" ON storage.objects FOR DELETE USING (bucket_id = 'music-files' AND auth.uid()::text = (storage.foldername(name))[1]);
 
 -- Policies for users
 CREATE POLICY "Users can view own profile" ON users FOR SELECT USING (auth.uid() = id);

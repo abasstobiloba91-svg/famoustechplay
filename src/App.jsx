@@ -1025,12 +1025,76 @@ const Login=({go,onLogin})=>{
   );
 };
 
+// ── UPLOAD MODAL ─────────────────────────────────────────────────────────────
+const UploadModal=({user,onClose,onUpload})=>{
+  const[file,setFile]=useState(null);
+  const[title,setTitle]=useState("");
+  const[type,setType]=useState("Single");
+  const[genre,setGenre]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[err,setErr]=useState("");
+
+  const handleUpload=async()=>{
+    if(!file||!title||!genre){setErr("Please fill all fields and select a file.");return;}
+    setLoading(true);setErr("");
+    try{
+      const fileExt=file.name.split('.').pop();
+      const fileName=`${user.id}/${Date.now()}.${fileExt}`;
+      const {data,error}=await supabase.storage.from('music-files').upload(fileName,file);
+      if(error)throw error;
+      const {data:urlData}=supabase.storage.from('music-files').getPublicUrl(fileName);
+      const {data:rel,error:relError}=await supabase.from('releases').insert({
+        aId:user.id,title,type,genre,status:'pending_review',file_url:urlData.publicUrl
+      }).select().single();
+      if(relError)throw relError;
+      onUpload(rel);
+    }catch(e){setErr(e.message);}
+    setLoading(false);
+  };
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:20}}>
+      <div style={{background:BG,border:`1px solid ${B1}`,borderRadius:20,padding:24,maxWidth:400,width:"100%",maxHeight:"90vh",overflow:"auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <h3 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:900}}>Upload New Release</h3>
+          <button onClick={onClose} style={{background:"none",border:"none",color:SB,fontSize:20,cursor:"pointer"}}>×</button>
+        </div>
+        {err&&<div style={{background:"rgba(255,23,68,.07)",border:"1px solid rgba(255,23,68,.18)",borderRadius:12,padding:"11px 15px",fontSize:13.5,color:"#FF1744",marginBottom:18}}>{err}</div>}
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Title</div>
+            <input type="text" value={title} onChange={e=>setTitle(e.target.value)} placeholder="Release title"/>
+          </div>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Type</div>
+            <select value={type} onChange={e=>setType(e.target.value)}>
+              <option>Single</option><option>EP</option><option>Album</option>
+            </select>
+          </div>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Genre</div>
+            <input type="text" value={genre} onChange={e=>setGenre(e.target.value)} placeholder="e.g. Afrobeats"/>
+          </div>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Audio File</div>
+            <input type="file" accept="audio/*" onChange={e=>setFile(e.target.files[0])}/>
+          </div>
+          <Btn full onClick={handleUpload} disabled={loading}>
+            {loading?"Uploading…":"Upload Release"}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── ARTIST DASHBOARD ─────────────────────────────────────────────────────────
 const ArtistDash=({user,onLogout})=>{
   const[tab,setTab]=useState("overview");
   const[mob,setMob]=useState(window.innerWidth<768);
   const[rels,setRels]=useState([]);
   const[pays,setPays]=useState([]);
+  const[showUpload,setShowUpload]=useState(false);
   useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
   useEffect(() => {
     const fetchData = async () => {
@@ -1149,7 +1213,7 @@ const ArtistDash=({user,onLogout})=>{
           <div>
             <div className="fu" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22,flexWrap:"wrap",gap:12}}>
               <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>My Releases</h2>
-              <Btn sz="sm">+ Upload New</Btn>
+              <Btn sz="sm" onClick={()=>setShowUpload(true)}>+ Upload New</Btn>
             </div>
             <div className="fu d1" style={{display:"flex",flexDirection:"column",gap:12}}>
               {rels.map(r=>(
@@ -1253,6 +1317,7 @@ const ArtistDash=({user,onLogout})=>{
           ))}
         </div>
       )}
+      {showUpload&&<UploadModal user={user} onClose={()=>setShowUpload(false)} onUpload={(newRel)=>{setRels([...rels,newRel]);setShowUpload(false);}}/>}
     </div>
   );
 };
