@@ -1591,6 +1591,17 @@ const AdminDash=({user,onLogout})=>{
 
 // ── APP ROOT ─────────────────────────────────────────────────────────────────
 export default function App(){
+  // show error if env vars not provided
+  if(supabaseUrl.startsWith('YOUR_')||supabaseAnonKey.startsWith('YOUR_')){
+    return(
+      <div style={{padding:40,fontFamily:'sans-serif',color:'#333'}}>
+        <h1>Configuration error</h1>
+        <p>The Supabase URL/key environment variables are not set.</p>
+        <p>Please follow the README instructions and add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to your environment (on Vercel or in a .env file) then redeploy.</p>
+      </div>
+    );
+  }
+
   const[page,setPage]=useState("home");
   const[user,setUser]=useState(null);
   const go=p=>{setPage(p);window.scrollTo(0,0);};
