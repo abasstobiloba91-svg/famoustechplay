@@ -877,6 +877,7 @@ const Login=({go,onLogin})=>{
   const[err,setErr]=useState("");
   const[ld,setLd]=useState(false);
   const[mob,setMob]=useState(window.innerWidth<768);
+  const[showSignUp,setShowSignUp]=useState(false);
   useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
   const try_ = async (e, p) => {
     setLd(true);
@@ -1017,8 +1018,71 @@ const Login=({go,onLogin})=>{
             ))}
           </div>
           <p style={{fontSize:12.5,color:MT,marginTop:20,textAlign:"center"}}>
-            Don't have an account? <span style={{color:G,cursor:"pointer",fontWeight:600}}>Sign up free →</span>
+            Don't have an account? <span style={{color:G,cursor:"pointer",fontWeight:600}} onClick={()=>setShowSignUp(true)}>Sign up free →</span>
           </p>
+        </div>
+      </div>
+      {showSignUp&&<SignUpModal onClose={()=>setShowSignUp(false)} onSignUp={onLogin}/>}
+    </div>
+  );
+};
+
+// ── SIGN UP MODAL ────────────────────────────────────────────────────────────
+const SignUpModal=({onClose,onSignUp})=>{
+  const[email,setEmail]=useState("");
+  const[pass,setPass]=useState("");
+  const[name,setName]=useState("");
+  const[role,setRole]=useState("artist");
+  const[loading,setLoading]=useState(false);
+  const[err,setErr]=useState("");
+
+  const handleSignUp=async()=>{
+    if(!email||!pass||!name){setErr("Please fill all fields.");return;}
+    setLoading(true);setErr("");
+    try{
+      const {data,error}=await supabase.auth.signUp({email,password:pass});
+      if(error)throw error;
+      // Insert user profile
+      const {error:profileError}=await supabase.from('users').insert({
+        id:data.user.id,email,name,role,av:name.split(' ').map(n=>n[0]).join('').toUpperCase()
+      });
+      if(profileError)throw profileError;
+      onSignUp({id:data.user.id,email,name,role,av:name.split(' ').map(n=>n[0]).join('').toUpperCase()});
+    }catch(e){setErr(e.message);}
+    setLoading(false);
+  };
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:20}}>
+      <div style={{background:BG,border:`1px solid ${B1}`,borderRadius:20,padding:24,maxWidth:400,width:"100%"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <h3 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:900}}>Sign Up</h3>
+          <button onClick={onClose} style={{background:"none",border:"none",color:SB,fontSize:20,cursor:"pointer"}}>×</button>
+        </div>
+        {err&&<div style={{background:"rgba(255,23,68,.07)",border:"1px solid rgba(255,23,68,.18)",borderRadius:12,padding:"11px 15px",fontSize:13.5,color:"#FF1744",marginBottom:18}}>{err}</div>}
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Name</div>
+            <input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="Your name"/>
+          </div>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Email</div>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com"/>
+          </div>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Password</div>
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••"/>
+          </div>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Role</div>
+            <select value={role} onChange={e=>setRole(e.target.value)}>
+              <option value="artist">Artist</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <Btn full onClick={handleSignUp} disabled={loading}>
+            {loading?"Signing up…":"Sign Up"}
+          </Btn>
         </div>
       </div>
     </div>
