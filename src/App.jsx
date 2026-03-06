@@ -1,4 +1,5 @@
-import{useState,useEffect,useRef}from"react";
+import { useState, useEffect, useRef } from "react";
+import { supabase } from "./supabase.js";
 
 const G="#00E676",BL="#29B6F6",OR="#FF6D00",
   BG="#04060C",S="#07090F",CARD="#0B0E1A",C2="#0F1221",
@@ -877,12 +878,41 @@ const Login=({go,onLogin})=>{
   const[ld,setLd]=useState(false);
   const[mob,setMob]=useState(window.innerWidth<768);
   useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  const try_=(e,p)=>{
-    setLd(true);setErr("");
-    setTimeout(()=>{
-      const u=DB.users.find(u=>u.email===e&&u.pass===p);
-      if(u){onLogin(u);}else{setErr("Invalid credentials. Use the demo buttons below.");setLd(false);}
-    },900);
+  const try_ = async (e, p) => {
+    setLd(true);
+    setErr("");
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: e,
+        password: p
+      });
+      if (error) {
+        setErr(error.message);
+      } else {
+        // Fetch user profile
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+        if (profileError) {
+          setErr("Failed to load user profile.");
+        } else {
+          onLogin(profile);
+        }
+      }
+    } catch (error) {
+      setErr("An error occurred. Please try again.");
+    }
+    setLd(false);
+  };
+  const demoTry = (e, p) => {
+    setLd(true);
+    setErr("");
+    setTimeout(() => {
+      const u = DB.users.find(u => u.email === e && u.pass === p);
+      if (u) { onLogin(u); } else { setErr("Invalid credentials. Use the demo buttons below."); setLd(false); }
+    }, 900);
   };
   return(
     <div style={{minHeight:"100vh",display:"flex",flexDirection:mob?"column":"row",overflow:"hidden"}}>
@@ -974,7 +1004,7 @@ const Login=({go,onLogin})=>{
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
             {[["artist@demo.com","demo","ARTIST",G,"Nova Reyes"],
               ["admin@demo.com","admin","ADMIN",OR,"Admin User"]].map(([e,p,lbl,c,nm])=>(
-              <button key={lbl} onClick={()=>try_(e,p)}
+              <button key={lbl} onClick={()=>demoTry(e,p)}
                 style={{background:C2,border:`1px solid ${B1}`,borderRadius:12,
                   padding:"12px 14px",cursor:"pointer",color:"#fff",fontSize:13.5,
                   fontWeight:600,fontFamily:"inherit",transition:"all .15s",textAlign:"left"}}
@@ -999,9 +1029,23 @@ const Login=({go,onLogin})=>{
 const ArtistDash=({user,onLogout})=>{
   const[tab,setTab]=useState("overview");
   const[mob,setMob]=useState(window.innerWidth<768);
+  const[rels,setRels]=useState([]);
+  const[pays,setPays]=useState([]);
   useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  const rels=DB.releases.filter(r=>r.aId===user.id);
-  const pays=DB.payouts.filter(p=>p.aId===user.id);
+  useEffect(() => {
+    const fetchData = async () => {
+      if (user.id <= 2) { // demo users
+        setRels(DB.releases.filter(r => r.aId === user.id));
+        setPays(DB.payouts.filter(p => p.aId === user.id));
+      } else {
+        const { data: releases } = await supabase.from('releases').select('*').eq('aId', user.id);
+        const { data: payouts } = await supabase.from('payouts').select('*').eq('aId', user.id);
+        setRels(releases || []);
+        setPays(payouts || []);
+      }
+    };
+    fetchData();
+  }, [user.id]);
   const totE=rels.reduce((s,r)=>s+r.earnings,0);
   const totS=rels.reduce((s,r)=>s+r.streams,0);
   const ml=mob?0:210;
@@ -1399,7 +1443,27 @@ export default function App(){
   const[user,setUser]=useState(null);
   const go=p=>{setPage(p);window.scrollTo(0,0);};
   const onLogin=u=>{setUser(u);setPage("dashboard");};
-  const onLogout=()=>{setUser(null);go("home");};
+  const onLogout=async ()=>{await supabase.auth.signOut(); setUser(null); go("home");};
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
+        setUser(profile);
+        setPage("dashboard");
+      }
+    };
+    checkUser();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const { data: profile } = await supabase.from('users').select('*').eq('id', session.user.id).single();
+        setUser(profile);
+      } else {
+        setUser(null);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
   const isPub=["home","careers","contact"].includes(page);
   return(
     <>
