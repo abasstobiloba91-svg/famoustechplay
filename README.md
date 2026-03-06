@@ -22,11 +22,15 @@ A music distribution platform built with React and Vite, deployed on Vercel.
 
 1. Create a new project on [Supabase](https://supabase.com)
 2. Go to Settings > API to get your project URL and anon key
-3. Update `src/supabase.js` with your URL and key:
-   ```javascript
-   const supabaseUrl = 'https://your-project.supabase.co'
-   const supabaseAnonKey = 'your-anon-key'
-   ```
+3. Provide your Supabase credentials:
+   - **Local development:** create a `.env` file in the project root with
+     ```
+     VITE_SUPABASE_URL=https://your-project.supabase.co
+     VITE_SUPABASE_ANON_KEY=your-anon-key
+     ```
+   - **Vercel deployment:** add the same two variables under Project Settings → Environment Variables.
+     (use the `VITE_` prefix so they are embedded into the client build.)
+   The code reads these values automatically, falling back to placeholders if missing.
 4. Run the SQL in `supabase-setup.sql` in your Supabase SQL editor
 5. For demo users, they use local data; for real users, sign up via Supabase auth
 
