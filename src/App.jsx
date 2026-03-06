@@ -1032,7 +1032,6 @@ const SignUpModal=({onClose,onSignUp})=>{
   const[email,setEmail]=useState("");
   const[pass,setPass]=useState("");
   const[name,setName]=useState("");
-  const[role,setRole]=useState("artist");
   const[loading,setLoading]=useState(false);
   const[err,setErr]=useState("");
 
@@ -1042,9 +1041,9 @@ const SignUpModal=({onClose,onSignUp})=>{
     try{
       const {data,error}=await supabase.auth.signUp({email,password:pass});
       if(error)throw error;
-      // Insert user profile
+      // Insert user profile (default to artist)
       const {error:profileError}=await supabase.from('users').insert({
-        id:data.user.id,email,name,role,av:name.split(' ').map(n=>n[0]).join('').toUpperCase()
+        id:data.user.id,email,name,role:'artist',av:name.split(' ').map(n=>n[0]).join('').toUpperCase()
       });
       if(profileError)throw profileError;
       onSignUp({id:data.user.id,email,name,role,av:name.split(' ').map(n=>n[0]).join('').toUpperCase()});
@@ -1072,13 +1071,6 @@ const SignUpModal=({onClose,onSignUp})=>{
           <div>
             <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Password</div>
             <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••"/>
-          </div>
-          <div>
-            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Role</div>
-            <select value={role} onChange={e=>setRole(e.target.value)}>
-              <option value="artist">Artist</option>
-              <option value="admin">Admin</option>
-            </select>
           </div>
           <Btn full onClick={handleSignUp} disabled={loading}>
             {loading?"Signing up…":"Sign Up"}
@@ -1390,7 +1382,26 @@ const ArtistDash=({user,onLogout})=>{
 const AdminDash=({user,onLogout})=>{
   const[tab,setTab]=useState("overview");
   const[mob,setMob]=useState(window.innerWidth<768);
+  const[allRels,setAllRels]=useState(DB.releases);
+  const[artists,setArtists]=useState(DB.users.filter(u=>u.role==='artist'));
+  const[pays,setPays]=useState(DB.payouts);
   useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
+  useEffect(()=>{
+    const load = async ()=>{
+      try{
+        const {data:rels,error:relErr} = await supabase.from('releases').select('*');
+        if(relErr) throw relErr;
+        if(rels) setAllRels(rels);
+        const {data:us,error:usErr} = await supabase.from('users').select('*');
+        if(usErr) throw usErr;
+        if(us) setArtists(us.filter(u=>u.role==='artist'));
+        const {data:pw,error:pwErr} = await supabase.from('payouts').select('*');
+        if(pwErr) throw pwErr;
+        if(pw) setPays(pw);
+      }catch(e){/* ignore, demo fallback remains */}
+    };
+    load();
+  },[]);
   const ml=mob?0:210;
 
   return(
@@ -1441,7 +1452,7 @@ const AdminDash=({user,onLogout})=>{
               ))}
             </div>
             <div style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:800,marginBottom:14}}>Pending Review</div>
-            {DB.releases.filter(r=>r.status==="pending_review").map(r=>(
+            {allRels.filter(r=>r.status==="pending_review").map(r=>(
               <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"14px 18px",display:"flex",alignItems:"center",gap:14,marginBottom:10,flexWrap:"wrap"}}>
                 <div style={{width:44,height:44,borderRadius:12,background:`linear-gradient(135deg,${G}18,${BL}10)`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🎵</div>
                 <div style={{flex:1,minWidth:0}}>
@@ -1449,8 +1460,14 @@ const AdminDash=({user,onLogout})=>{
                   <div style={{fontSize:12,color:SB,marginTop:2}}>{r.type} · {r.genre}</div>
                 </div>
                 <div style={{display:"flex",gap:8}}>
-                  <Btn sz="sm" v="s">✓ Approve</Btn>
-                  <Btn sz="sm" v="r">✗ Reject</Btn>
+                  <Btn sz="sm" v="s" onClick={async()=>{
+                      await supabase.from('releases').update({status:'distributed'}).eq('id',r.id);
+                      setAllRels(allRels.map(x=>x.id===r.id?{...x,status:'distributed'}:x));
+                  }}>✓ Approve</Btn>
+                  <Btn sz="sm" v="r" onClick={async()=>{
+                      await supabase.from('releases').update({status:'rejected'}).eq('id',r.id);
+                      setAllRels(allRels.map(x=>x.id===r.id?{...x,status:'rejected'}:x));
+                  }}>✗ Reject</Btn>
                 </div>
               </div>
             ))}
@@ -1463,7 +1480,7 @@ const AdminDash=({user,onLogout})=>{
               <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>All Releases</h2>
             </div>
             <div className="fu d1" style={{display:"flex",flexDirection:"column",gap:10}}>
-              {DB.releases.map(r=>(
+              {allRels.map(r=>(
                 <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"15px 18px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:5,flexWrap:"wrap"}}>
@@ -1473,8 +1490,14 @@ const AdminDash=({user,onLogout})=>{
                   </div>
                   {r.status==="pending_review"&&(
                     <div style={{display:"flex",gap:8,flexShrink:0}}>
-                      <Btn sz="sm" v="s">Approve</Btn>
-                      <Btn sz="sm" v="r">Reject</Btn>
+                      <Btn sz="sm" v="s" onClick={async()=>{
+                          await supabase.from('releases').update({status:'distributed'}).eq('id',r.id);
+                          setAllRels(allRels.map(x=>x.id===r.id?{...x,status:'distributed'}:x));
+                      }}>Approve</Btn>
+                      <Btn sz="sm" v="r" onClick={async()=>{
+                          await supabase.from('releases').update({status:'rejected'}).eq('id',r.id);
+                          setAllRels(allRels.map(x=>x.id===r.id?{...x,status:'rejected'}:x));
+                      }}>Reject</Btn>
                     </div>
                   )}
                 </div>
@@ -1489,8 +1512,8 @@ const AdminDash=({user,onLogout})=>{
               <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>Artists</h2>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12}}>
-              {DB.users.filter(u=>u.role==="artist").map(u=>{
-                const uR=DB.releases.filter(r=>r.aId===u.id);
+              {artists.map(u=>{
+                const uR=allRels.filter(r=>r.aId===u.id);
                 return(
                   <div key={u.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:18,padding:20}}>
                     <div style={{display:"flex",alignItems:"center",gap:13,marginBottom:16}}>
