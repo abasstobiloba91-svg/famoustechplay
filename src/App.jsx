@@ -391,7 +391,7 @@ const Home=({go})=>{
           </div>
 
           {/* Stats bar */}
-          <div className="fu d4" style={{display:"flex",gap:"clamp(12px,3vw,40px)",flexWrap:"wrap",
+          <div className="fu d4" style={{gap:"clamp(12px,3vw,40px)",flexWrap:"wrap",
             justifyContent:"center",padding:"20px 28px",
             background:"rgba(255,255,255,0.025)",backdropFilter:"blur(20px)",
             border:`1px solid ${B1}`,borderRadius:20,marginBottom:52,display:"inline-flex"}}>
