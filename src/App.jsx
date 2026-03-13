@@ -1,5 +1,10 @@
-import { useState, useEffect, useRef } from "react";
-import { supabase } from "./supabase.js";
+import React, { useState, useEffect, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const SUPA_URL = "https://flfjlaaajsdzbhldgvso.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZsZmpsYWFhanNkemJobGRndnNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4NjQ1MzcsImV4cCI6MjA4ODQ0MDUzN30.ka2SSllYgDF4cgGkJfw4cMUac8z3OkpmZC4JF_umCIQ";
+const supabase = createClient(SUPA_URL, SUPA_KEY);
+
 
 const G="#00E676",BL="#29B6F6",OR="#FF6D00",
   BG="#04060C",S="#07090F",CARD="#0B0E1A",C2="#0F1221",
@@ -391,7 +396,7 @@ const Home=({go})=>{
           </div>
 
           {/* Stats bar */}
-          <div className="fu d4" style={{gap:"clamp(12px,3vw,40px)",flexWrap:"wrap",
+          <div className="fu d4" style={{display:"flex",gap:"clamp(12px,3vw,40px)",flexWrap:"wrap",
             justifyContent:"center",padding:"20px 28px",
             background:"rgba(255,255,255,0.025)",backdropFilter:"blur(20px)",
             border:`1px solid ${B1}`,borderRadius:20,marginBottom:52,display:"inline-flex"}}>
@@ -872,64 +877,86 @@ const Careers=()=>{
 
 // ── LOGIN ────────────────────────────────────────────────────────────────────
 const Login=({go,onLogin})=>{
+  const[mode,setMode]=useState("signin");
   const[email,setEmail]=useState("");
   const[pass,setPass]=useState("");
+  const[name,setName]=useState("");
   const[err,setErr]=useState("");
+  const[msg,setMsg]=useState("");
   const[ld,setLd]=useState(false);
   const[mob,setMob]=useState(window.innerWidth<768);
-  const[showSignUp,setShowSignUp]=useState(false);
   useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  const try_ = async (e, p) => {
-    setLd(true);
-    setErr("");
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: e,
-        password: p
-      });
-      if (error) {
-        setErr(error.message);
-      } else {
-        // Fetch user profile
-        const { data: profile, error: profileError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-        if (profileError) {
-          setErr("Failed to load user profile.");
-        } else {
-          onLogin(profile);
-        }
+
+  const doSignIn=async()=>{
+    if(!email||!pass)return;
+    setLd(true);setErr("");
+    try{
+      const d=await supa.auth.signIn(email,pass);
+      if(d.error||d.error_description){
+        setErr(d.error_description||d.error||"Invalid email or password.");
+        setLd(false);return;
       }
-    } catch (error) {
-      setErr("An error occurred. Please try again.");
+      const token=d.access_token;
+      const userId=d.user?.id;
+      // Get profile for role
+      let profile=await supa.auth.getProfile(userId,token);
+      // If no profile yet, use user metadata
+      if(!profile){
+        profile={
+          id:userId,
+          name:d.user?.user_metadata?.name||email.split("@")[0],
+          role:d.user?.user_metadata?.role||"artist",
+          plan:"Free",
+          avatar_initials:(d.user?.user_metadata?.name||"U").slice(0,2).toUpperCase()
+        };
+      }
+      // Store session in memory
+      const userData={
+        id:userId,
+        email:d.user?.email,
+        name:profile.name||email.split("@")[0],
+        role:profile.role||"artist",
+        plan:profile.plan||"Free",
+        av:profile.avatar_initials||(profile.name||"U").slice(0,2).toUpperCase(),
+        token
+      };
+      onLogin(userData);
+    }catch(e){
+      setErr("Connection error. Please check your internet and try again.");
+      setLd(false);
     }
-    setLd(false);
   };
-  const demoTry = (e, p) => {
-    setLd(true);
-    setErr("");
-    setTimeout(() => {
-      const u = DB.users.find(u => u.email === e && u.pass === p);
-      if (u) { onLogin(u); } else { setErr("Invalid credentials. Use the demo buttons below."); setLd(false); }
-    }, 900);
+
+  const doSignUp=async()=>{
+    if(!email||!pass||!name)return;
+    if(pass.length<6){setErr("Password must be at least 6 characters.");return;}
+    setLd(true);setErr("");
+    try{
+      const d=await supa.auth.signUp(email,pass,name);
+      if(d.error||d.error_description){
+        setErr(d.error_description||d.error||"Could not create account.");
+        setLd(false);return;
+      }
+      setLd(false);
+      setMsg("✅ Check your email to confirm your account, then sign in!");
+      setMode("signin");
+    }catch(e){
+      setErr("Connection error. Please try again.");
+      setLd(false);
+    }
   };
+
   return(
     <div style={{minHeight:"100vh",display:"flex",flexDirection:mob?"column":"row",overflow:"hidden"}}>
-      {/* Left panel */}
       {!mob&&(
         <div style={{flex:"0 0 46%",background:S,display:"flex",flexDirection:"column",
           justifyContent:"center",padding:"60px clamp(32px,5vw,72px)",
           position:"relative",overflow:"hidden",borderRight:`1px solid ${B1}`}}>
-          <div style={{position:"absolute",top:-100,right:-80,width:400,height:400,borderRadius:"50%",
-            background:`radial-gradient(${G}07,transparent 65%)`,pointerEvents:"none"}}/>
-          <div style={{position:"absolute",bottom:-80,left:-60,width:300,height:300,borderRadius:"50%",
-            background:`radial-gradient(${BL}05,transparent 65%)`,pointerEvents:"none"}}/>
+          <div style={{position:"absolute",top:-100,right:-80,width:400,height:400,borderRadius:"50%",background:`radial-gradient(${G}07,transparent 65%)`,pointerEvents:"none"}}/>
+          <div style={{position:"absolute",bottom:-80,left:-60,width:300,height:300,borderRadius:"50%",background:`radial-gradient(${BL}05,transparent 65%)`,pointerEvents:"none"}}/>
           <div style={{position:"relative",zIndex:1}}>
             <div style={{cursor:"pointer",marginBottom:52}} onClick={()=>go("home")}><Logo sz={28}/></div>
-            <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(28px,3.5vw,44px)",
-              fontWeight:900,letterSpacing:"-2px",lineHeight:1.05,marginBottom:16}}>
+            <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(28px,3.5vw,44px)",fontWeight:900,letterSpacing:"-2px",lineHeight:1.05,marginBottom:16}}>
               Distribute your music.<br/><span style={{color:G}}>Keep everything.</span>
             </h1>
             <p style={{fontSize:14.5,color:SB,lineHeight:1.75,marginBottom:36,maxWidth:340}}>
@@ -937,235 +964,118 @@ const Login=({go,onLogin})=>{
             </p>
             {[["🎵","100+ platforms worldwide"],["₦","Multi-currency payouts"],["🔒","100% royalties kept"],["⚡","Live in 2–3 business days"]].map(([ic,t])=>(
               <div key={t} style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-                <div style={{width:32,height:32,borderRadius:9,background:`${G}10`,
-                  border:`1px solid ${G}18`,display:"flex",alignItems:"center",
-                  justifyContent:"center",fontSize:15,flexShrink:0}}>{ic}</div>
+                <div style={{width:32,height:32,borderRadius:9,background:`${G}10`,border:`1px solid ${G}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>{ic}</div>
                 <span style={{fontSize:14,color:SB}}>{t}</span>
               </div>
             ))}
-            {/* Mini DSP row */}
             <div style={{display:"flex",gap:8,marginTop:32,flexWrap:"wrap"}}>
               {["Spotify","Apple Music","Boomplay","Audiomack"].map(name=>{
                 const Icon=DSP[name];
                 return(
-                  <div key={name} style={{width:36,height:36,borderRadius:10,background:`${B1}`,
-                    border:`1px solid ${B1}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <div key={name} style={{width:36,height:36,borderRadius:10,background:B1,border:`1px solid ${B1}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
                     {Icon&&<Icon size={18}/>}
                   </div>
                 );
               })}
-              <div style={{width:36,height:36,borderRadius:10,background:B1,border:`1px solid ${B1}`,
-                display:"flex",alignItems:"center",justifyContent:"center",
-                fontSize:10,color:MT,fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>+97</div>
+              <div style={{width:36,height:36,borderRadius:10,background:B1,border:`1px solid ${B1}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:MT,fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>+97</div>
             </div>
           </div>
         </div>
       )}
-      {/* Right panel */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",
-        justifyContent:"center",padding:mob?"88px 20px 40px":"44px 32px",
-        minHeight:mob?"100vh":undefined,position:"relative"}}>
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:mob?"88px 20px 40px":"44px 32px",minHeight:mob?"100vh":undefined,position:"relative"}}>
         <div style={{position:"absolute",inset:0,background:`radial-gradient(ellipse 60% 50% at 50% 50%,${G}04,transparent 70%)`,pointerEvents:"none"}}/>
         <div style={{width:"100%",maxWidth:400,position:"relative",zIndex:1}}>
           {mob&&<div style={{display:"flex",justifyContent:"center",marginBottom:32}}><Logo sz={26} onClick={()=>go("home")}/></div>}
           <button onClick={()=>go("home")}
-            style={{fontSize:13,color:MT,marginBottom:28,cursor:"pointer",display:"flex",
-              alignItems:"center",gap:6,background:"none",border:"none",fontFamily:"inherit",
-              fontWeight:500,transition:"color .14s"}}
+            style={{fontSize:13,color:MT,marginBottom:28,cursor:"pointer",display:"flex",alignItems:"center",gap:6,background:"none",border:"none",fontFamily:"inherit",fontWeight:500,transition:"color .14s"}}
             onMouseEnter={e=>e.currentTarget.style.color=SB}
             onMouseLeave={e=>e.currentTarget.style.color=MT}>← Back to website</button>
-          <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:28,fontWeight:900,
-            letterSpacing:"-1.2px",marginBottom:6}}>Welcome back</h2>
-          <p style={{fontSize:14,color:SB,marginBottom:28}}>Sign in to your FamousTechPlay account</p>
-          {err&&(
-            <div style={{background:"rgba(255,23,68,.07)",border:"1px solid rgba(255,23,68,.18)",
-              borderRadius:12,padding:"11px 15px",fontSize:13.5,color:"#FF1744",
-              marginBottom:18,lineHeight:1.5}}>{err}</div>
-          )}
-          <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            <div>
-              <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Email</div>
-              <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                placeholder="your@email.com" onKeyDown={e=>e.key==="Enter"&&try_(email,pass)}/>
-            </div>
-            <div>
-              <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Password</div>
-              <input type="password" value={pass} onChange={e=>setPass(e.target.value)}
-                placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&try_(email,pass)}/>
-            </div>
-            <Btn full sz="lg" disabled={!email||!pass||ld} onClick={()=>try_(email,pass)}>
-              {ld?<><span className="spinning" style={{width:14,height:14,border:"2px solid rgba(0,0,0,.3)",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block"}}/>Signing in…</>:"Sign In →"}
-            </Btn>
-          </div>
-          <div style={{margin:"22px 0",display:"flex",alignItems:"center",gap:10}}>
-            <div style={{flex:1,height:1,background:B1}}/>
-            <span style={{fontSize:10.5,color:MT,fontFamily:"'JetBrains Mono',monospace",letterSpacing:".05em"}}>TRY DEMO</span>
-            <div style={{flex:1,height:1,background:B1}}/>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
-            {[["artist@demo.com","demo","ARTIST",G,"Nova Reyes"],
-              ["admin@demo.com","admin","ADMIN",OR,"Admin User"]].map(([e,p,lbl,c,nm])=>(
-              <button key={lbl} onClick={()=>demoTry(e,p)}
-                style={{background:C2,border:`1px solid ${B1}`,borderRadius:12,
-                  padding:"12px 14px",cursor:"pointer",color:"#fff",fontSize:13.5,
-                  fontWeight:600,fontFamily:"inherit",transition:"all .15s",textAlign:"left"}}
-                onMouseEnter={x=>{x.currentTarget.style.borderColor=`${c}45`;x.currentTarget.style.background=`${c}06`;}}
-                onMouseLeave={x=>{x.currentTarget.style.borderColor=B1;x.currentTarget.style.background=C2;}}>
-                <div style={{fontSize:10,color:c,fontFamily:"'JetBrains Mono',monospace",
-                  marginBottom:4,fontWeight:700}}>{lbl}</div>
-                {nm}
+
+          {/* Tab switcher */}
+          <div style={{display:"flex",background:C2,borderRadius:14,padding:4,marginBottom:28,border:`1px solid ${B1}`}}>
+            {[["signin","Sign In"],["signup","Create Account"]].map(([m,l])=>(
+              <button key={m} onClick={()=>{setMode(m);setErr("");setMsg("");}}
+                style={{flex:1,padding:"10px",borderRadius:11,fontSize:13.5,fontWeight:700,cursor:"pointer",border:"none",fontFamily:"inherit",transition:"all .18s",
+                  background:mode===m?"rgba(255,255,255,0.08)":"transparent",
+                  color:mode===m?"#fff":SB}}>
+                {l}
               </button>
             ))}
           </div>
-          <p style={{fontSize:12.5,color:MT,marginTop:20,textAlign:"center"}}>
-            Don't have an account? <span style={{color:G,cursor:"pointer",fontWeight:600}} onClick={()=>setShowSignUp(true)}>Sign up free →</span>
+
+          <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:26,fontWeight:900,letterSpacing:"-1px",marginBottom:6}}>
+            {mode==="signin"?"Welcome back":"Join FamousTechPlay"}
+          </h2>
+          <p style={{fontSize:14,color:SB,marginBottom:24}}>
+            {mode==="signin"?"Sign in to your account":"Create your free artist account"}
           </p>
-        </div>
-      </div>
-      {showSignUp&&<SignUpModal onClose={()=>setShowSignUp(false)} onSignUp={onLogin}/>}
-    </div>
-  );
-};
 
-// ── SIGN UP MODAL ────────────────────────────────────────────────────────────
-const SignUpModal=({onClose,onSignUp})=>{
-  const[email,setEmail]=useState("");
-  const[pass,setPass]=useState("");
-  const[name,setName]=useState("");
-  const[loading,setLoading]=useState(false);
-  const[err,setErr]=useState("");
+          {msg&&(
+            <div style={{background:"rgba(0,230,118,.07)",border:`1px solid ${G}25`,borderRadius:12,padding:"11px 15px",fontSize:13.5,color:G,marginBottom:18,lineHeight:1.6}}>{msg}</div>
+          )}
+          {err&&(
+            <div style={{background:"rgba(255,23,68,.07)",border:"1px solid rgba(255,23,68,.18)",borderRadius:12,padding:"11px 15px",fontSize:13.5,color:"#FF1744",marginBottom:18,lineHeight:1.5}}>{err}</div>
+          )}
 
-  const handleSignUp=async()=>{
-    if(!email||!pass||!name){setErr("Please fill all fields.");return;}
-    setLoading(true);setErr("");
-    try{
-      const {data,error}=await supabase.auth.signUp({email,password:pass});
-      if(error)throw error;
-      // Insert user profile (default to artist)
-      const {error:profileError}=await supabase.from('users').insert({
-        id:data.user.id,email,name,role:'artist',av:name.split(' ').map(n=>n[0]).join('').toUpperCase()
-      });
-      if(profileError)throw profileError;
-      onSignUp({id:data.user.id,email,name,role,av:name.split(' ').map(n=>n[0]).join('').toUpperCase()});
-    }catch(e){setErr(e.message);}
-    setLoading(false);
-  };
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {mode==="signup"&&(
+              <div>
+                <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Your Name</div>
+                <input value={name} onChange={e=>setName(e.target.value)} placeholder="Ada Okonkwo"/>
+              </div>
+            )}
+            <div>
+              <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Email</div>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com"
+                onKeyDown={e=>e.key==="Enter"&&(mode==="signin"?doSignIn():doSignUp())}/>
+            </div>
+            <div>
+              <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Password</div>
+              <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••"
+                onKeyDown={e=>e.key==="Enter"&&(mode==="signin"?doSignIn():doSignUp())}/>
+              {mode==="signup"&&<div style={{fontSize:11,color:MT,marginTop:5}}>Minimum 6 characters</div>}
+            </div>
+            <Btn full sz="lg"
+              disabled={mode==="signin"?(!email||!pass||ld):(!email||!pass||!name||ld)}
+              onClick={mode==="signin"?doSignIn:doSignUp}>
+              {ld?(
+                <><span className="spinning" style={{width:14,height:14,border:"2px solid rgba(0,0,0,.3)",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block"}}/>
+                {mode==="signin"?"Signing in…":"Creating account…"}</>
+              ):mode==="signin"?"Sign In →":"Create Free Account →"}
+            </Btn>
+          </div>
 
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:20}}>
-      <div style={{background:BG,border:`1px solid ${B1}`,borderRadius:20,padding:24,maxWidth:400,width:"100%"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <h3 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:900}}>Sign Up</h3>
-          <button onClick={onClose} style={{background:"none",border:"none",color:SB,fontSize:20,cursor:"pointer"}}>×</button>
-        </div>
-        {err&&<div style={{background:"rgba(255,23,68,.07)",border:"1px solid rgba(255,23,68,.18)",borderRadius:12,padding:"11px 15px",fontSize:13.5,color:"#FF1744",marginBottom:18}}>{err}</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:16}}>
-          <div>
-            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Name</div>
-            <input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="Your name"/>
-          </div>
-          <div>
-            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Email</div>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com"/>
-          </div>
-          <div>
-            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Password</div>
-            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••"/>
-          </div>
-          <Btn full onClick={handleSignUp} disabled={loading}>
-            {loading?"Signing up…":"Sign Up"}
-          </Btn>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ── UPLOAD MODAL ─────────────────────────────────────────────────────────────
-const UploadModal=({user,onClose,onUpload})=>{
-  const[file,setFile]=useState(null);
-  const[title,setTitle]=useState("");
-  const[type,setType]=useState("Single");
-  const[genre,setGenre]=useState("");
-  const[loading,setLoading]=useState(false);
-  const[err,setErr]=useState("");
-
-  const handleUpload=async()=>{
-    if(!file||!title||!genre){setErr("Please fill all fields and select a file.");return;}
-    setLoading(true);setErr("");
-    try{
-      const fileExt=file.name.split('.').pop();
-      const fileName=`${user.id}/${Date.now()}.${fileExt}`;
-      const {data,error}=await supabase.storage.from('music-files').upload(fileName,file);
-      if(error)throw error;
-      const {data:urlData}=supabase.storage.from('music-files').getPublicUrl(fileName);
-      const {data:rel,error:relError}=await supabase.from('releases').insert({
-        aId:user.id,title,type,genre,status:'pending_review',file_url:urlData.publicUrl
-      }).select().single();
-      if(relError)throw relError;
-      onUpload(rel);
-    }catch(e){setErr(e.message);}
-    setLoading(false);
-  };
-
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:20}}>
-      <div style={{background:BG,border:`1px solid ${B1}`,borderRadius:20,padding:24,maxWidth:400,width:"100%",maxHeight:"90vh",overflow:"auto"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <h3 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:900}}>Upload New Release</h3>
-          <button onClick={onClose} style={{background:"none",border:"none",color:SB,fontSize:20,cursor:"pointer"}}>×</button>
-        </div>
-        {err&&<div style={{background:"rgba(255,23,68,.07)",border:"1px solid rgba(255,23,68,.18)",borderRadius:12,padding:"11px 15px",fontSize:13.5,color:"#FF1744",marginBottom:18}}>{err}</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:16}}>
-          <div>
-            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Title</div>
-            <input type="text" value={title} onChange={e=>setTitle(e.target.value)} placeholder="Release title"/>
-          </div>
-          <div>
-            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Type</div>
-            <select value={type} onChange={e=>setType(e.target.value)}>
-              <option>Single</option><option>EP</option><option>Album</option>
-            </select>
-          </div>
-          <div>
-            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Genre</div>
-            <input type="text" value={genre} onChange={e=>setGenre(e.target.value)} placeholder="e.g. Afrobeats"/>
-          </div>
-          <div>
-            <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Audio File</div>
-            <input type="file" accept="audio/*" onChange={e=>setFile(e.target.files[0])}/>
-          </div>
-          <Btn full onClick={handleUpload} disabled={loading}>
-            {loading?"Uploading…":"Upload Release"}
-          </Btn>
+          {mode==="signin"&&(
+            <>
+              <div style={{margin:"22px 0",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{flex:1,height:1,background:B1}}/>
+                <span style={{fontSize:10.5,color:MT,fontFamily:"'JetBrains Mono',monospace",letterSpacing:".05em"}}>OR</span>
+                <div style={{flex:1,height:1,background:B1}}/>
+              </div>
+              <p style={{fontSize:12.5,color:MT,textAlign:"center"}}>
+                Don't have an account?{" "}
+                <span onClick={()=>{setMode("signup");setErr("");}} style={{color:G,cursor:"pointer",fontWeight:600}}>Sign up free →</span>
+              </p>
+            </>
+          )}
+          {mode==="signup"&&(
+            <p style={{fontSize:12,color:MT,marginTop:16,textAlign:"center",lineHeight:1.6}}>
+              By creating an account you agree to our Terms of Service. Already have one?{" "}
+              <span onClick={()=>{setMode("signin");setErr("");}} style={{color:G,cursor:"pointer",fontWeight:600}}>Sign in</span>
+            </p>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-// ── ARTIST DASHBOARD ─────────────────────────────────────────────────────────
 const ArtistDash=({user,onLogout})=>{
   const[tab,setTab]=useState("overview");
   const[mob,setMob]=useState(window.innerWidth<768);
-  const[rels,setRels]=useState([]);
-  const[pays,setPays]=useState([]);
-  const[showUpload,setShowUpload]=useState(false);
   useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  useEffect(() => {
-    const fetchData = async () => {
-      if (user.id <= 2) { // demo users
-        setRels(DB.releases.filter(r => r.aId === user.id));
-        setPays(DB.payouts.filter(p => p.aId === user.id));
-      } else {
-        const { data: releases } = await supabase.from('releases').select('*').eq('aId', user.id);
-        const { data: payouts } = await supabase.from('payouts').select('*').eq('aId', user.id);
-        setRels(releases || []);
-        setPays(payouts || []);
-      }
-    };
-    fetchData();
-  }, [user.id]);
+  const rels=DB.releases.filter(r=>r.aId===user.id);
+  const pays=DB.payouts.filter(p=>p.aId===user.id);
   const totE=rels.reduce((s,r)=>s+r.earnings,0);
   const totS=rels.reduce((s,r)=>s+r.streams,0);
   const ml=mob?0:210;
@@ -1269,7 +1179,7 @@ const ArtistDash=({user,onLogout})=>{
           <div>
             <div className="fu" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22,flexWrap:"wrap",gap:12}}>
               <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>My Releases</h2>
-              <Btn sz="sm" onClick={()=>setShowUpload(true)}>+ Upload New</Btn>
+              <Btn sz="sm">+ Upload New</Btn>
             </div>
             <div className="fu d1" style={{display:"flex",flexDirection:"column",gap:12}}>
               {rels.map(r=>(
@@ -1373,7 +1283,6 @@ const ArtistDash=({user,onLogout})=>{
           ))}
         </div>
       )}
-      {showUpload&&<UploadModal user={user} onClose={()=>setShowUpload(false)} onUpload={(newRel)=>{setRels([...rels,newRel]);setShowUpload(false);}}/>}
     </div>
   );
 };
@@ -1382,26 +1291,7 @@ const ArtistDash=({user,onLogout})=>{
 const AdminDash=({user,onLogout})=>{
   const[tab,setTab]=useState("overview");
   const[mob,setMob]=useState(window.innerWidth<768);
-  const[allRels,setAllRels]=useState(DB.releases);
-  const[artists,setArtists]=useState(DB.users.filter(u=>u.role==='artist'));
-  const[pays,setPays]=useState(DB.payouts);
   useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  useEffect(()=>{
-    const load = async ()=>{
-      try{
-        const {data:rels,error:relErr} = await supabase.from('releases').select('*');
-        if(relErr) throw relErr;
-        if(rels) setAllRels(rels);
-        const {data:us,error:usErr} = await supabase.from('users').select('*');
-        if(usErr) throw usErr;
-        if(us) setArtists(us.filter(u=>u.role==='artist'));
-        const {data:pw,error:pwErr} = await supabase.from('payouts').select('*');
-        if(pwErr) throw pwErr;
-        if(pw) setPays(pw);
-      }catch(e){/* ignore, demo fallback remains */}
-    };
-    load();
-  },[]);
   const ml=mob?0:210;
 
   return(
@@ -1452,7 +1342,7 @@ const AdminDash=({user,onLogout})=>{
               ))}
             </div>
             <div style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:800,marginBottom:14}}>Pending Review</div>
-            {allRels.filter(r=>r.status==="pending_review").map(r=>(
+            {DB.releases.filter(r=>r.status==="pending_review").map(r=>(
               <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"14px 18px",display:"flex",alignItems:"center",gap:14,marginBottom:10,flexWrap:"wrap"}}>
                 <div style={{width:44,height:44,borderRadius:12,background:`linear-gradient(135deg,${G}18,${BL}10)`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🎵</div>
                 <div style={{flex:1,minWidth:0}}>
@@ -1460,14 +1350,8 @@ const AdminDash=({user,onLogout})=>{
                   <div style={{fontSize:12,color:SB,marginTop:2}}>{r.type} · {r.genre}</div>
                 </div>
                 <div style={{display:"flex",gap:8}}>
-                  <Btn sz="sm" v="s" onClick={async()=>{
-                      await supabase.from('releases').update({status:'distributed'}).eq('id',r.id);
-                      setAllRels(allRels.map(x=>x.id===r.id?{...x,status:'distributed'}:x));
-                  }}>✓ Approve</Btn>
-                  <Btn sz="sm" v="r" onClick={async()=>{
-                      await supabase.from('releases').update({status:'rejected'}).eq('id',r.id);
-                      setAllRels(allRels.map(x=>x.id===r.id?{...x,status:'rejected'}:x));
-                  }}>✗ Reject</Btn>
+                  <Btn sz="sm" v="s">✓ Approve</Btn>
+                  <Btn sz="sm" v="r">✗ Reject</Btn>
                 </div>
               </div>
             ))}
@@ -1480,7 +1364,7 @@ const AdminDash=({user,onLogout})=>{
               <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>All Releases</h2>
             </div>
             <div className="fu d1" style={{display:"flex",flexDirection:"column",gap:10}}>
-              {allRels.map(r=>(
+              {DB.releases.map(r=>(
                 <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"15px 18px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:5,flexWrap:"wrap"}}>
@@ -1490,14 +1374,8 @@ const AdminDash=({user,onLogout})=>{
                   </div>
                   {r.status==="pending_review"&&(
                     <div style={{display:"flex",gap:8,flexShrink:0}}>
-                      <Btn sz="sm" v="s" onClick={async()=>{
-                          await supabase.from('releases').update({status:'distributed'}).eq('id',r.id);
-                          setAllRels(allRels.map(x=>x.id===r.id?{...x,status:'distributed'}:x));
-                      }}>Approve</Btn>
-                      <Btn sz="sm" v="r" onClick={async()=>{
-                          await supabase.from('releases').update({status:'rejected'}).eq('id',r.id);
-                          setAllRels(allRels.map(x=>x.id===r.id?{...x,status:'rejected'}:x));
-                      }}>Reject</Btn>
+                      <Btn sz="sm" v="s">Approve</Btn>
+                      <Btn sz="sm" v="r">Reject</Btn>
                     </div>
                   )}
                 </div>
@@ -1512,8 +1390,8 @@ const AdminDash=({user,onLogout})=>{
               <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>Artists</h2>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12}}>
-              {artists.map(u=>{
-                const uR=allRels.filter(r=>r.aId===u.id);
+              {DB.users.filter(u=>u.role==="artist").map(u=>{
+                const uR=DB.releases.filter(r=>r.aId===u.id);
                 return(
                   <div key={u.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:18,padding:20}}>
                     <div style={{display:"flex",alignItems:"center",gap:13,marginBottom:16}}>
@@ -1590,44 +1468,206 @@ const AdminDash=({user,onLogout})=>{
 };
 
 // ── APP ROOT ─────────────────────────────────────────────────────────────────
-export default function App(){
-  // show error if env vars not provided
-  if(supabaseUrl.startsWith('YOUR_')||supabaseAnonKey.startsWith('YOUR_')){
-    return(
-      <div style={{padding:40,fontFamily:'sans-serif',color:'#333'}}>
-        <h1>Configuration error</h1>
-        <p>The Supabase URL/key environment variables are not set.</p>
-        <p>Please follow the README instructions and add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to your environment (on Vercel or in a .env file) then redeploy.</p>
-      </div>
-    );
-  }
+const Login=({go,onLogin})=>{
+  const[mode,setMode]=useState("signin");
+  const[email,setEmail]=useState("");
+  const[pass,setPass]=useState("");
+  const[name,setName]=useState("");
+  const[err,setErr]=useState("");
+  const[msg,setMsg]=useState("");
+  const[ld,setLd]=useState(false);
+  const[mob,setMob]=useState(window.innerWidth<768);
+  useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
 
+  const doSignIn=async()=>{
+    if(!email||!pass)return;
+    setLd(true);setErr("");
+    const{data,error}=await supabase.auth.signInWithPassword({email,password:pass});
+    if(error){setErr(error.message);setLd(false);return;}
+    // Get profile
+    const{data:profile}=await supabase.from("profiles").select("*").eq("id",data.user.id).single();
+    const userData={
+      id:data.user.id,
+      email:data.user.email,
+      name:profile?.name||email.split("@")[0],
+      role:profile?.role||"artist",
+      plan:profile?.plan||"Free",
+      av:profile?.avatar_initials||(profile?.name||"U").slice(0,2).toUpperCase(),
+    };
+    onLogin(userData);
+    setLd(false);
+  };
+
+  const doSignUp=async()=>{
+    if(!email||!pass||!name)return;
+    if(pass.length<6){setErr("Password must be at least 6 characters.");return;}
+    setLd(true);setErr("");
+    const{error}=await supabase.auth.signUp({
+      email,password:pass,
+      options:{data:{name,role:"artist"}}
+    });
+    if(error){setErr(error.message);setLd(false);return;}
+    setLd(false);
+    setMsg("✅ Check your email to confirm your account, then sign in!");
+    setMode("signin");
+  };
+
+  return(
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:mob?"column":"row",overflow:"hidden"}}>
+      {!mob&&(
+        <div style={{flex:"0 0 46%",background:S,display:"flex",flexDirection:"column",
+          justifyContent:"center",padding:"60px clamp(32px,5vw,72px)",
+          position:"relative",overflow:"hidden",borderRight:`1px solid ${B1}`}}>
+          <div style={{position:"absolute",top:-100,right:-80,width:400,height:400,borderRadius:"50%",background:`radial-gradient(${G}07,transparent 65%)`,pointerEvents:"none"}}/>
+          <div style={{position:"absolute",bottom:-80,left:-60,width:300,height:300,borderRadius:"50%",background:`radial-gradient(${BL}05,transparent 65%)`,pointerEvents:"none"}}/>
+          <div style={{position:"relative",zIndex:1}}>
+            <div style={{cursor:"pointer",marginBottom:52}} onClick={()=>go("home")}><Logo sz={28}/></div>
+            <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(28px,3.5vw,44px)",fontWeight:900,letterSpacing:"-2px",lineHeight:1.05,marginBottom:16}}>
+              Distribute your music.<br/><span style={{color:G}}>Keep everything.</span>
+            </h1>
+            <p style={{fontSize:14.5,color:SB,lineHeight:1.75,marginBottom:36,maxWidth:340}}>
+              Join 2,000+ Nigerian artists already earning on Spotify, Boomplay, Apple Music & 97 more platforms — completely free.
+            </p>
+            {[["🎵","100+ platforms worldwide"],["₦","Multi-currency payouts"],["🔒","100% royalties kept"],["⚡","Live in 2–3 business days"]].map(([ic,t])=>(
+              <div key={t} style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+                <div style={{width:32,height:32,borderRadius:9,background:`${G}10`,border:`1px solid ${G}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>{ic}</div>
+                <span style={{fontSize:14,color:SB}}>{t}</span>
+              </div>
+            ))}
+            <div style={{display:"flex",gap:8,marginTop:32,flexWrap:"wrap"}}>
+              {["Spotify","Apple Music","Boomplay","Audiomack"].map(nm=>{
+                const Icon=DSP[nm];
+                return(
+                  <div key={nm} style={{width:36,height:36,borderRadius:10,background:B1,border:`1px solid ${B1}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {Icon&&<Icon size={18}/>}
+                  </div>
+                );
+              })}
+              <div style={{width:36,height:36,borderRadius:10,background:B1,border:`1px solid ${B1}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:MT,fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>+97</div>
+            </div>
+          </div>
+        </div>
+      )}
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:mob?"88px 20px 40px":"44px 32px",minHeight:mob?"100vh":undefined,position:"relative"}}>
+        <div style={{position:"absolute",inset:0,background:`radial-gradient(ellipse 60% 50% at 50% 50%,${G}04,transparent 70%)`,pointerEvents:"none"}}/>
+        <div style={{width:"100%",maxWidth:400,position:"relative",zIndex:1}}>
+          {mob&&<div style={{display:"flex",justifyContent:"center",marginBottom:32}}><Logo sz={26} onClick={()=>go("home")}/></div>}
+          <button onClick={()=>go("home")}
+            style={{fontSize:13,color:MT,marginBottom:28,cursor:"pointer",display:"flex",alignItems:"center",gap:6,background:"none",border:"none",fontFamily:"inherit",fontWeight:500,transition:"color .14s"}}
+            onMouseEnter={e=>e.currentTarget.style.color=SB}
+            onMouseLeave={e=>e.currentTarget.style.color=MT}>← Back to website</button>
+          <div style={{display:"flex",background:C2,borderRadius:14,padding:4,marginBottom:28,border:`1px solid ${B1}`}}>
+            {[["signin","Sign In"],["signup","Create Account"]].map(([m,l])=>(
+              <button key={m} onClick={()=>{setMode(m);setErr("");setMsg("");}}
+                style={{flex:1,padding:"10px",borderRadius:11,fontSize:13.5,fontWeight:700,cursor:"pointer",border:"none",fontFamily:"inherit",transition:"all .18s",
+                  background:mode===m?"rgba(255,255,255,0.08)":"transparent",color:mode===m?"#fff":SB}}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:26,fontWeight:900,letterSpacing:"-1px",marginBottom:6}}>
+            {mode==="signin"?"Welcome back":"Join FamousTechPlay"}
+          </h2>
+          <p style={{fontSize:14,color:SB,marginBottom:24}}>
+            {mode==="signin"?"Sign in to your account":"Create your free artist account"}
+          </p>
+          {msg&&<div style={{background:"rgba(0,230,118,.07)",border:`1px solid ${G}25`,borderRadius:12,padding:"11px 15px",fontSize:13.5,color:G,marginBottom:18,lineHeight:1.6}}>{msg}</div>}
+          {err&&<div style={{background:"rgba(255,23,68,.07)",border:"1px solid rgba(255,23,68,.18)",borderRadius:12,padding:"11px 15px",fontSize:13.5,color:"#FF1744",marginBottom:18,lineHeight:1.5}}>{err}</div>}
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {mode==="signup"&&(
+              <div>
+                <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Your Name</div>
+                <input value={name} onChange={e=>setName(e.target.value)} placeholder="Ada Okonkwo"/>
+              </div>
+            )}
+            <div>
+              <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Email</div>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com"
+                onKeyDown={e=>e.key==="Enter"&&(mode==="signin"?doSignIn():doSignUp())}/>
+            </div>
+            <div>
+              <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Password</div>
+              <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••"
+                onKeyDown={e=>e.key==="Enter"&&(mode==="signin"?doSignIn():doSignUp())}/>
+              {mode==="signup"&&<div style={{fontSize:11,color:MT,marginTop:5}}>Minimum 6 characters</div>}
+            </div>
+            <Btn full sz="lg"
+              disabled={mode==="signin"?(!email||!pass||ld):(!email||!pass||!name||ld)}
+              onClick={mode==="signin"?doSignIn:doSignUp}>
+              {ld?(
+                <><span className="spinning" style={{width:14,height:14,border:"2px solid rgba(0,0,0,.3)",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block"}}/>
+                {mode==="signin"?"Signing in…":"Creating account…"}</>
+              ):mode==="signin"?"Sign In →":"Create Free Account →"}
+            </Btn>
+          </div>
+          {mode==="signin"&&(
+            <p style={{fontSize:12.5,color:MT,marginTop:20,textAlign:"center"}}>
+              Don't have an account?{" "}
+              <span onClick={()=>{setMode("signup");setErr("");}} style={{color:G,cursor:"pointer",fontWeight:600}}>Sign up free →</span>
+            </p>
+          )}
+          {mode==="signup"&&(
+            <p style={{fontSize:12,color:MT,marginTop:16,textAlign:"center",lineHeight:1.6}}>
+              Already have an account?{" "}
+              <span onClick={()=>{setMode("signin");setErr("");}} style={{color:G,cursor:"pointer",fontWeight:600}}>Sign in</span>
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function App(){
   const[page,setPage]=useState("home");
   const[user,setUser]=useState(null);
+  const[loading,setLoading]=useState(true);
+
+  useEffect(()=>{
+    // Check existing Supabase session on load
+    supabase.auth.getSession().then(async({data:{session}})=>{
+      if(session){
+        const{data:profile}=await supabase.from("profiles").select("*").eq("id",session.user.id).single();
+        if(profile){
+          setUser({
+            id:session.user.id,
+            email:session.user.email,
+            name:profile.name||session.user.email.split("@")[0],
+            role:profile.role||"artist",
+            plan:profile.plan||"Free",
+            av:profile.avatar_initials||(profile.name||"U").slice(0,2).toUpperCase(),
+          });
+          setPage("dashboard");
+        }
+      }
+      setLoading(false);
+    });
+    // Listen for auth changes
+    const{data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
+      if(!session){setUser(null);setPage("home");}
+    });
+    return()=>subscription.unsubscribe();
+  },[]);
+
   const go=p=>{setPage(p);window.scrollTo(0,0);};
   const onLogin=u=>{setUser(u);setPage("dashboard");};
-  const onLogout=async ()=>{await supabase.auth.signOut(); setUser(null); go("home");};
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
-        setUser(profile);
-        setPage("dashboard");
-      }
-    };
-    checkUser();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const { data: profile } = await supabase.from('users').select('*').eq('id', session.user.id).single();
-        setUser(profile);
-      } else {
-        setUser(null);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  const onLogout=async()=>{
+    await supabase.auth.signOut();
+    setUser(null);
+    go("home");
+  };
+
   const isPub=["home","careers","contact"].includes(page);
+
+  if(loading)return(
+    <div style={{minHeight:"100vh",background:BG,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center"}}>
+        <div className="spinning" style={{width:32,height:32,border:`2px solid ${B1}`,borderTopColor:G,borderRadius:"50%",margin:"0 auto 16px"}}/>
+        <div style={{fontSize:13,color:MT,fontFamily:"'JetBrains Mono',monospace"}}>Loading…</div>
+      </div>
+    </div>
+  );
+
   return(
     <>
       <style>{CSS}</style>
@@ -1638,6 +1678,7 @@ export default function App(){
       {page==="login"&&!user&&<Login go={go} onLogin={onLogin}/>}
       {page==="dashboard"&&user?.role==="artist"&&<ArtistDash user={user} onLogout={onLogout}/>}
       {page==="dashboard"&&user?.role==="admin"&&<AdminDash user={user} onLogout={onLogout}/>}
+      {page==="dashboard"&&user&&!["artist","admin"].includes(user.role)&&<ArtistDash user={user} onLogout={onLogout}/>}
       {isPub&&<Footer go={go}/>}
     </>
   );
