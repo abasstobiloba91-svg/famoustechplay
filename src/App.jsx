@@ -891,9 +891,9 @@ const Login=({go,onLogin})=>{
     if(!email||!pass)return;
     setLd(true);setErr("");
     try{
-      const d=await supa.auth.signIn(email,pass);
-      if(d.error||d.error_description){
-        setErr(d.error_description||d.error||"Invalid email or password.");
+      const d=await supa.auth.signInWithPassword({email,password:pass});
+      if(d.error){
+        setErr(d.error.message||"Invalid email or password.");
         setLd(false);return;
       }
       const token=d.access_token;
@@ -932,13 +932,15 @@ const Login=({go,onLogin})=>{
     if(pass.length<6){setErr("Password must be at least 6 characters.");return;}
     setLd(true);setErr("");
     try{
-      const d=await supa.auth.signUp(email,pass,name);
-      if(d.error||d.error_description){
-        setErr(d.error_description||d.error||"Could not create account.");
-        setLd(false);return;
+      const d=await supa.auth.signUp({email,password:pass,options:{data:{name}}});
+      if(d.error){setErr(d.error.message||"Could not create account.");setLd(false);return;}
+      if(d.data?.user){
+        await supa.from("profiles").upsert({
+          id:d.data.user.id,email,name,role:"artist",plan:"Free",av:name.slice(0,2).toUpperCase()
+        });
       }
       setLd(false);
-      setMsg("✅ Check your email to confirm your account, then sign in!");
+      setMsg("✅ Account created! You can now sign in.");
       setMode("signin");
     }catch(e){
       setErr("Connection error. Please try again.");
