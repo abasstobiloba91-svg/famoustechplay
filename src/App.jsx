@@ -1,1540 +1,1160 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-const SUPA_URL = "https://eryeaaomkkzyyklnfaxa.supabase.co";
-const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyeWVhYW9ta2t6eXlrbG5mYXhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MTE0NDUsImV4cCI6MjA4ODM4NzQ0NX0.WxLQQuvWLcQLfMYJ4cqj3YM9GtHsMiRVt5Dt4IK1o5c";
-const supabase = createClient(SUPA_URL, SUPA_KEY);
+// ── SUPABASE ──────────────────────────────────────────────────────────────────
+const supabase = createClient(
+  "https://eryeaaomkkzyyklnfaxa.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyeWVhYW9ta2t6eXlrbG5mYXhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MTE0NDUsImV4cCI6MjA4ODM4NzQ0NX0.WxLQQuvWLcQLfMYJ4cqj3YM9GtHsMiRVt5Dt4IK1o5c"
+);
 
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const G = "#00E676", BL = "#29B6F6", OR = "#FF6D00";
+const BG = "#04060C", CARD = "#0B0E1A", BORDER = "rgba(255,255,255,0.07)";
+const WHITE = "#ffffff", MUTED = "#8892A4";
+const PRO_PRICE = 25000;
+const FREE_RELEASE_LIMIT = 3;
 
-const G="#00E676",BL="#29B6F6",OR="#FF6D00",
-  BG="#04060C",S="#07090F",CARD="#0B0E1A",C2="#0F1221",
-  W="#fff",SB="#8892A4",MT="#3D4560",
-  B1="rgba(255,255,255,0.06)",B2="rgba(255,255,255,0.10)";
+const DSPs = ["Spotify","Apple Music","Boomplay","Audiomack","Tidal","YouTube Music","Deezer","Amazon Music","Pandora","SoundCloud"];
 
-const SM={
-  distributed:{l:"Live",c:G},
-  pending_review:{l:"In Review",c:"#FFB300"},
-  in_distribution:{l:"Distributing",c:BL},
-  rejected:{l:"Rejected",c:"#FF1744"}
+const STATUS_MAP = {
+  pending_review: { label: "In Review", color: "#FFB300" },
+  approved:       { label: "Approved",  color: BL },
+  distributed:    { label: "Live",      color: G },
+  rejected:       { label: "Rejected",  color: "#FF1744" },
 };
 
-const fmt=n=>`₦${new Intl.NumberFormat("en-NG").format(Math.round(n))}`;
-const fK=n=>new Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:1}).format(n);
+const fmt  = n => `₦${new Intl.NumberFormat("en-NG").format(Math.round(n||0))}`;
+const fmtK = n => new Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:1}).format(n||0);
+const initials = name => (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
 
-// ── REAL DSP SVG LOGOS ──────────────────────────────────────────────────────
-const DSP={
-  Spotify:({size=22})=>(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="#1DB954">
-      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-    </svg>
-  ),
-  "Apple Music":({size=22})=>(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="#fff">
-      <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026C4.786.07 4.043.15 3.34.428 2.004.958 1.04 1.88.475 3.208a5.494 5.494 0 00-.39 1.548c-.06.536-.087 1.072-.085 1.61 0 .09-.01.18-.013.27v12.76c.003.1.013.2.016.29.009.5.04 1.003.129 1.499.246 1.388.943 2.484 2.073 3.298a4.973 4.973 0 001.6.664c.53.113 1.066.163 1.606.176.055 0 .11.008.165.011h12.027c.09-.003.18-.01.27-.013.495-.009.99-.04 1.475-.116a5.048 5.048 0 003.585-2.298 5.196 5.196 0 00.88-2.508c.06-.54.084-1.082.088-1.624.001-.065.01-.13.013-.195V6.41c-.003-.09-.01-.18-.013-.27zm-6.77 9.866a2.028 2.028 0 01-1.978.038l-4.822-2.453V7.965l6.8 1.743v6.282z"/>
-    </svg>
-  ),
-  Tidal:({size=22})=>(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="#fff">
-      <path d="M12.012 3.992L8.008 7.996 4.004 3.992 0 7.996l4.004 4.004 4.004-4.004 4.004 4.004 4.004-4.004zM8.008 16.004l4.004-4.004 4.004 4.004 4.004-4.004-4.004-4.004-4.004 4.004-4.004-4.004L4.004 12z"/>
-    </svg>
-  ),
-  Boomplay:({size=22})=>(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="12" fill="#F50"/>
-      <path d="M7 8.5a1 1 0 011-1h3.5c2.485 0 4 1.343 4 3.25 0 1.907-1.515 3.25-4 3.25H9v2.5H7V8.5zm2 3.75h2.5c1.2 0 2-.55 2-1.5s-.8-1.5-2-1.5H9v3z" fill="#fff"/>
-    </svg>
-  ),
-  Audiomack:({size=22})=>(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <rect width="24" height="24" rx="6" fill="#FF6600"/>
-      <path d="M5 15l3.5-7 3 5 2-3 2 5H5z" fill="#fff" fillRule="evenodd"/>
-    </svg>
-  ),
-  "YouTube Music":({size=22})=>(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <rect width="24" height="24" rx="12" fill="#FF0000"/>
-      <circle cx="12" cy="12" r="4" fill="#fff"/>
-      <circle cx="12" cy="12" r="2" fill="#FF0000"/>
-    </svg>
-  ),
-  Deezer:({size=22})=>(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <rect width="3" height="8" x="1" y="10" rx="1" fill="#00C7F2"/>
-      <rect width="3" height="11" x="5.5" y="7" rx="1" fill="#FF0090"/>
-      <rect width="3" height="14" x="10" y="4" rx="1" fill="#FF8000"/>
-      <rect width="3" height="17" x="14.5" y="1" rx="1" fill="#00C7F2"/>
-      <rect width="3" height="20" x="19" y="-2" rx="1" fill="#A238FF"/>
-    </svg>
-  ),
-  Amazon:({size=22})=>(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <rect width="24" height="24" rx="6" fill="#232F3E"/>
-      <path d="M5 14.5c3.5 1.8 9.5 2.2 13-.2" stroke="#FF9900" strokeWidth="1.8" strokeLinecap="round"/>
-      <path d="M16.5 13.5l1.5 1-1.5.5" stroke="#FF9900" strokeWidth="1.2" strokeLinecap="round"/>
-      <text x="4" y="11" fontSize="6.5" fill="#fff" fontFamily="sans-serif" fontWeight="bold">music</text>
-    </svg>
-  ),
-  Pandora:({size=22})=>(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <rect width="24" height="24" rx="6" fill="#3668FF"/>
-      <text x="6" y="16" fontSize="13" fill="#fff" fontFamily="sans-serif" fontWeight="900">P</text>
-    </svg>
-  ),
-  SoundCloud:({size=22})=>(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="#FF5500">
-      <path d="M1.175 12.225c-.015.135 0 .27 0 .405v.045c.03 1.635 1.335 2.955 2.985 2.955h10.44c1.485 0 2.7-1.215 2.7-2.7V9.225a4.35 4.35 0 00-4.35-4.35 4.32 4.32 0 00-2.58.855A5.84 5.84 0 003.79 8.01c-.105 0-.195-.015-.3-.015-1.38 0-2.52.99-2.7 2.325-.285.075-.465.36-.465.63 0 .465.315.84.735.99.045.09.105.18.105.285z"/>
-    </svg>
-  ),
-  Anghami:({size=22})=>(
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <rect width="24" height="24" rx="12" fill="#7B2FBE"/>
-      <path d="M12 6a6 6 0 100 12A6 6 0 0012 6zm0 9a3 3 0 110-6 3 3 0 010 6z" fill="#fff"/>
-      <circle cx="12" cy="12" r="1.5" fill="#7B2FBE"/>
-    </svg>
-  ),
+// ── STYLES ────────────────────────────────────────────────────────────────────
+const css = {
+  page:    { minHeight:"100vh", background:BG, color:WHITE, fontFamily:"system-ui,sans-serif" },
+  card:    { background:CARD, border:`1px solid ${BORDER}`, borderRadius:16, padding:24 },
+  input:   { width:"100%", padding:"12px 16px", background:"rgba(255,255,255,0.05)",
+             border:`1px solid ${BORDER}`, borderRadius:10, color:WHITE,
+             fontSize:15, outline:"none", boxSizing:"border-box" },
+  btnG:    { padding:"13px 28px", background:G, color:"#000", border:"none",
+             borderRadius:10, fontWeight:700, fontSize:15, cursor:"pointer", width:"100%" },
+  btnGhost:{ padding:"11px 24px", background:"transparent", color:WHITE,
+             border:`1px solid ${BORDER}`, borderRadius:10, fontWeight:600,
+             fontSize:14, cursor:"pointer" },
+  label:   { fontSize:13, color:MUTED, marginBottom:6, display:"block" },
+  tag:     { display:"inline-flex", alignItems:"center", gap:6, padding:"4px 12px",
+             borderRadius:20, fontSize:12, fontWeight:700 },
+  topbar:  { position:"fixed", top:0, left:0, right:0, height:62, zIndex:100,
+             background:"rgba(4,6,12,0.96)", backdropFilter:"blur(20px)",
+             borderBottom:`1px solid ${BORDER}`, display:"flex",
+             alignItems:"center", justifyContent:"space-between",
+             padding:"0 24px" },
+  sidebar: { position:"fixed", top:62, left:0, bottom:0, width:220,
+             background:CARD, borderRight:`1px solid ${BORDER}`,
+             display:"flex", flexDirection:"column", padding:"16px 0", overflowY:"auto" },
+  main:    { paddingTop:82, paddingLeft:240, paddingRight:24, paddingBottom:40, minHeight:"100vh" },
+  mainMob: { paddingTop:82, padding:"82px 16px 80px" },
 };
 
-const DSP_LIST=["Spotify","Apple Music","Tidal","Boomplay","Audiomack","YouTube Music","Deezer","Amazon","Pandora","SoundCloud","Anghami"];
-
-const CSS=`
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html{scroll-behavior:smooth;}
-body{background:#04060C;color:#fff;font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
-::-webkit-scrollbar{width:2px;}::-webkit-scrollbar-thumb{background:#3D4560;border-radius:2px;}
-button,input,select,textarea{font-family:'DM Sans',sans-serif;}
-input,select,textarea{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);color:#fff;border-radius:14px;padding:13px 16px;font-size:14px;outline:none;width:100%;transition:border-color .2s,box-shadow .2s;resize:vertical;}
-input:focus,select:focus,textarea:focus{border-color:#00E67650;box-shadow:0 0 0 3px #00E67608;}
-input::placeholder,textarea::placeholder{color:#3D4560;}
-select option{background:#07090F;}
-a{text-decoration:none;color:inherit;}
-@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes shimmer{0%{background-position:200% center}100%{background-position:-200% center}}
-@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
-@keyframes glow{0%,100%{box-shadow:0 0 0 0 #00E67630}50%{box-shadow:0 0 20px 4px #00E67640}}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-@keyframes borderGlow{0%,100%{border-color:rgba(0,230,118,.2)}50%{border-color:rgba(0,230,118,.5)}}
-.fu{animation:fadeUp .5s cubic-bezier(.16,1,.3,1) both;}
-.fi{animation:fadeIn .3s ease both;}
-.d1{animation-delay:.07s}.d2{animation-delay:.14s}.d3{animation-delay:.21s}.d4{animation-delay:.28s}.d5{animation-delay:.35s}
-.gt{background:linear-gradient(90deg,#00E676,#29B6F6,#FF6D00,#00E676);background-size:300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 6s linear infinite;}
-.hover-lift{transition:transform .2s,box-shadow .2s;}.hover-lift:hover{transform:translateY(-3px);box-shadow:0 16px 48px rgba(0,0,0,.6);}
-.hover-glow{transition:border-color .2s,box-shadow .2s;}.hover-glow:hover{border-color:rgba(0,230,118,.25)!important;box-shadow:0 0 0 1px rgba(0,230,118,.1);}
-.spinning{animation:spin .8s linear infinite;}
-`;
-
-const Logo=({sz=26,onClick})=>(
-  <div onClick={onClick} style={{display:"flex",alignItems:"center",gap:10,userSelect:"none",cursor:onClick?"pointer":"default"}}>
-    <div style={{position:"relative",width:sz,height:sz}}>
-      <svg width={sz} height={sz} viewBox="0 0 100 100" fill="none">
-        <defs>
-          <linearGradient id="lg1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={G}/>
-            <stop offset="50%" stopColor={BL}/>
-            <stop offset="100%" stopColor={OR}/>
-          </linearGradient>
-        </defs>
-        <circle cx="50" cy="50" r="46" fill="rgba(0,230,118,0.06)" stroke="rgba(0,230,118,0.15)" strokeWidth="1"/>
-        <path d="M50 8A42 42 0 0 1 90 50" stroke={G} strokeWidth="11" strokeLinecap="round"/>
-        <path d="M90 50A42 42 0 0 1 28 90" stroke={BL} strokeWidth="11" strokeLinecap="round"/>
-        <path d="M28 90A42 42 0 0 1 50 8" stroke={OR} strokeWidth="11" strokeLinecap="round"/>
-        <polygon points="40,32 40,68 72,50" fill="#fff"/>
-      </svg>
-    </div>
-    <div>
-      <div style={{fontFamily:"'Syne',sans-serif",fontSize:sz<28?14:17,fontWeight:800,letterSpacing:"-.5px",lineHeight:1}}>FamousTechPlay</div>
-      <div style={{fontSize:6.5,fontWeight:700,color:SB,letterSpacing:"1.5px",fontFamily:"'JetBrains Mono',monospace",marginTop:2}}>DISTRIBUTE · EARN · GROW</div>
-    </div>
+// ── LOGO ─────────────────────────────────────────────────────────────────────
+const Logo = ({ size = 26 }) => (
+  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+    <svg width={size} height={size} viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="19" fill="none" stroke={G}  strokeWidth="4" strokeDasharray="28 60" strokeLinecap="round"/>
+      <circle cx="20" cy="20" r="19" fill="none" stroke={BL} strokeWidth="4" strokeDasharray="22 66" strokeLinecap="round" strokeDashoffset="-32"/>
+      <circle cx="20" cy="20" r="19" fill="none" stroke={OR} strokeWidth="4" strokeDasharray="12 76" strokeLinecap="round" strokeDashoffset="-56"/>
+      <polygon points="16,13 16,27 28,20" fill={WHITE}/>
+    </svg>
+    <span style={{ fontWeight:800, fontSize:size*0.72, letterSpacing:"-0.5px" }}>FamousTechPlay</span>
   </div>
 );
 
-const Btn=({children,onClick,v="p",sz="md",full,disabled,sx:extra={}})=>{
-  const V={
-    p:{background:`linear-gradient(135deg,${G} 0%,#00C853 100%)`,color:"#030A06",boxShadow:`0 4px 20px ${G}30`},
-    b:{background:`linear-gradient(135deg,${BL},#0284C7)`,color:"#030810"},
-    o:{background:`linear-gradient(135deg,#FF9340,${OR})`,color:"#fff",boxShadow:`0 4px 18px ${OR}30`},
-    g:{background:"transparent",color:SB,border:`1px solid ${B2}`},
-    gl:{background:"rgba(255,255,255,.05)",color:"#fff",border:`1px solid rgba(255,255,255,.12)`},
-    r:{background:"rgba(255,23,68,.08)",color:"#FF1744",border:"1px solid rgba(255,23,68,.18)"},
-    s:{background:"rgba(0,230,118,.08)",color:G,border:"1px solid rgba(0,230,118,.2)"},
-  };
-  const SZ={
-    sm:{padding:"7px 16px",fontSize:12.5,borderRadius:10,fontWeight:600},
-    md:{padding:"11px 22px",fontSize:14,borderRadius:12,fontWeight:700},
-    lg:{padding:"14px 30px",fontSize:15,borderRadius:14,fontWeight:700},
-    xl:{padding:"16px 38px",fontSize:16,borderRadius:16,fontWeight:700},
-  };
-  return(
-    <button className="hover-lift" onClick={onClick} disabled={disabled}
-      style={{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8,
-        letterSpacing:"-.01em",border:"none",cursor:disabled?"not-allowed":"pointer",
-        opacity:disabled?.45:1,width:full?"100%":undefined,transition:"all .18s",
-        ...V[v],...SZ[sz],...extra}}>
-      {children}
-    </button>
-  );
-};
+// ── AUTH PAGE ─────────────────────────────────────────────────────────────────
+const AuthPage = ({ onLogin }) => {
+  const [mode, setMode]   = useState("signin");
+  const [name, setName]   = useState("");
+  const [email, setEmail] = useState("");
+  const [pass, setPass]   = useState("");
+  const [err, setErr]     = useState("");
+  const [msg, setMsg]     = useState("");
+  const [busy, setBusy]   = useState(false);
 
-const Badge=({s})=>{
-  const m=SM[s]||{l:s,c:SB};
-  return(
-    <span style={{display:"inline-flex",alignItems:"center",gap:6,background:`${m.c}10`,
-      border:`1px solid ${m.c}22`,borderRadius:999,padding:"4px 11px",
-      fontSize:11,fontWeight:700,color:m.c,fontFamily:"'JetBrains Mono',monospace",letterSpacing:".03em"}}>
-      <span style={{width:5,height:5,borderRadius:"50%",background:m.c,flexShrink:0,
-        animation:s==="distributed"?"glow 2s infinite":s==="in_distribution"?"pulse 1.5s infinite":"none"}}/>
-      {m.l}
-    </span>
-  );
-};
-
-const DspTag=({name,size=18})=>{
-  const Icon=DSP[name];
-  return(
-    <span style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.04)",
-      border:`1px solid ${B1}`,borderRadius:8,padding:"5px 10px",fontSize:11.5,
-      fontWeight:500,color:SB,whiteSpace:"nowrap"}}>
-      {Icon&&<Icon size={size}/>}{name}
-    </span>
-  );
-};
-
-// ── NAVIGATION ──────────────────────────────────────────────────────────────
-const Nav=({page,go})=>{
-  const[sc,setSc]=useState(false);
-  const[mob,setMob]=useState(window.innerWidth<768);
-  const[mn,setMn]=useState(false);
-  useEffect(()=>{
-    const a=()=>setSc(window.scrollY>20),b=()=>setMob(window.innerWidth<768);
-    window.addEventListener("scroll",a);window.addEventListener("resize",b);
-    return()=>{window.removeEventListener("scroll",a);window.removeEventListener("resize",b);};
-  },[]);
-  const nv=p=>{go(p);setMn(false);window.scrollTo(0,0);};
-  return(
-    <nav style={{position:"fixed",top:0,left:0,right:0,zIndex:200,
-      height:66,display:"flex",alignItems:"center",justifyContent:"space-between",
-      padding:"0 clamp(16px,4vw,56px)",
-      background:sc?"rgba(4,6,12,.92)":"transparent",
-      backdropFilter:sc?"blur(24px)":"none",
-      borderBottom:sc?`1px solid ${B1}`:"none",
-      transition:"all .3s"}}>
-      <Logo sz={26} onClick={()=>nv("home")}/>
-      {!mob?(
-        <div style={{display:"flex",alignItems:"center",gap:4}}>
-          {[["home","Home"],["careers","Careers"],["contact","Contact"]].map(([id,l])=>(
-            <button key={id} onClick={()=>nv(id)}
-              style={{padding:"8px 16px",borderRadius:10,fontSize:14,fontWeight:page===id?600:400,
-                cursor:"pointer",color:page===id?"#fff":SB,
-                background:page===id?"rgba(255,255,255,.07)":"transparent",
-                border:page===id?`1px solid ${B1}`:"1px solid transparent",
-                transition:"all .15s",fontFamily:"inherit"}}>
-              {l}
-            </button>
-          ))}
-          <div style={{width:1,height:20,background:B1,margin:"0 8px"}}/>
-          <Btn sz="sm" onClick={()=>nv("login")}>Artist Login →</Btn>
-        </div>
-      ):(
-        <>
-          <button onClick={()=>setMn(!mn)}
-            style={{width:38,height:38,background:"rgba(255,255,255,.05)",border:`1px solid ${B1}`,
-              borderRadius:10,display:"flex",flexDirection:"column",alignItems:"center",
-              justifyContent:"center",gap:5,cursor:"pointer"}}>
-            {[1,2,3].map(i=><span key={i} style={{width:i===2?10:16,height:1.5,background:SB,borderRadius:1,display:"block"}}/>)}
-          </button>
-          {mn&&(
-            <div className="fi" style={{position:"fixed",inset:0,top:66,background:"rgba(4,6,12,.97)",
-              backdropFilter:"blur(24px)",zIndex:199,display:"flex",flexDirection:"column",
-              alignItems:"center",justifyContent:"center",gap:10}}>
-              {[["home","Home"],["careers","Careers"],["contact","Contact"]].map(([id,l])=>(
-                <button key={id} onClick={()=>nv(id)}
-                  style={{padding:"16px 48px",fontSize:28,fontWeight:800,cursor:"pointer",
-                    color:page===id?G:"#fff",background:"transparent",border:"none",
-                    fontFamily:"'Syne',sans-serif",letterSpacing:"-.5px"}}>
-                  {l}
-                </button>
-              ))}
-              <div style={{height:1,width:60,background:B1,margin:"12px 0"}}/>
-              <Btn sz="lg" onClick={()=>nv("login")}>Artist Login →</Btn>
-            </div>
-          )}
-        </>
-      )}
-    </nav>
-  );
-};
-
-const Footer=({go})=>(
-  <footer style={{background:S,borderTop:`1px solid ${B1}`,padding:"52px clamp(16px,5vw,72px) 32px"}}>
-    <div style={{maxWidth:1100,margin:"0 auto"}}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:36,marginBottom:44}}>
-        <div>
-          <Logo sz={24} onClick={()=>go("home")}/>
-          <p style={{fontSize:13,color:SB,lineHeight:1.75,marginTop:14,maxWidth:200}}>Africa's premier free music distribution platform.</p>
-        </div>
-        {[["Platform",["Features","Platforms","Analytics","Payouts"]],
-          ["Company",["About","Careers","Blog","Press"]],
-          ["Support",["Help Center","Contact","Privacy","Terms"]]].map(([t,items])=>(
-          <div key={t}>
-            <div style={{fontSize:10,fontWeight:700,color:MT,letterSpacing:".12em",textTransform:"uppercase",
-              marginBottom:14,fontFamily:"'JetBrains Mono',monospace"}}>{t}</div>
-            {items.map(it=>(
-              <div key={it} style={{fontSize:13,color:SB,marginBottom:10,cursor:"pointer",transition:"color .14s"}}
-                onMouseEnter={e=>e.currentTarget.style.color="#fff"}
-                onMouseLeave={e=>e.currentTarget.style.color=SB}>{it}</div>
-            ))}
-          </div>
-        ))}
-      </div>
-      <div style={{borderTop:`1px solid ${B1}`,paddingTop:24,display:"flex",
-        justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-        <div style={{fontSize:12.5,color:MT}}>© 2024 FamousTechPlay. All rights reserved.</div>
-        <div style={{height:2,width:48,background:`linear-gradient(90deg,${G},${BL},${OR})`,borderRadius:1}}/>
-        <div style={{fontSize:12.5,color:MT}}>Made with ♥ in Lagos 🇳🇬</div>
-      </div>
-    </div>
-  </footer>
-);
-
-// ── HOME PAGE ────────────────────────────────────────────────────────────────
-const Home=({go})=>{
-  const dspPairs=DSP_LIST.map(n=>({name:n,Icon:DSP[n]}));
-
-  const feats=[
-    {i:"∞",t:"Upload Free. Forever.",d:"No fees, no hidden charges. Keep every naira you earn.",a:G},
-    {i:"◉",t:"100+ Global Platforms",d:"Spotify, Apple Music, Boomplay, Audiomack & 97 more in 150+ countries.",a:BL},
-    {i:"₦",t:"Multi-Currency Payouts",d:"NGN, USD, GBP, EUR. Opay, Palmpay, Wise — withdraw your way.",a:OR},
-    {i:"◈",t:"Real-Time Analytics",d:"Track streams, revenue and listener demographics live.",a:G},
-    {i:"⚡",t:"2–3 Day Distribution",d:"Reviewed, approved, and live on all platforms in days — not weeks.",a:BL},
-    {i:"◆",t:"100% Rights Retained",d:"Your masters, your publishing, your identity. Always.",a:OR},
-  ];
-
-  const steps=[
-    {n:"01",t:"Upload",d:"Submit your music, cover art and metadata. We review within 48 hours.",c:G},
-    {n:"02",t:"We Distribute",d:"Your music goes live on 100+ platforms simultaneously, worldwide.",c:BL},
-    {n:"03",t:"Get Paid",d:"Earnings land in your dashboard. Withdraw to bank, Opay, or Palmpay.",c:OR},
-  ];
-
-  const testi=[
-    {name:"Daveed Ayo",g:"Afrobeats · Lagos",q:"FamousTechPlay had my music on Boomplay and Spotify in 2 days. Now I earn monthly in naira with zero stress.",av:"DA",c:G},
-    {name:"Kemi Sounds",g:"Highlife · Enugu",q:"Withdrew to my Opay instantly. No drama, no waiting. I've tried DistroKid — this is easier and free.",av:"KS",c:BL},
-    {name:"T.Rill",g:"Amapiano · Abuja",q:"Hit the Boomplay Top 100 last month. All from a free upload. No artist should be paying for distribution in 2024.",av:"TR",c:OR},
-  ];
-
-  const compare=[
-    ["Upload Fee","FREE","$22.99/yr","$9.99/release"],
-    ["Nigerian Platforms","✓ All","Partial","Partial"],
-    ["NGN Direct Payouts","✓ Yes","✗ No","✗ No"],
-    ["Opay / Palmpay","✓ Yes","✗ No","✗ No"],
-    ["African Focus","✓ Built-in","✗ No","✗ No"],
-  ];
-
-  return(
-    <div>
-      {/* HERO */}
-      <section style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",
-        justifyContent:"center",padding:"100px clamp(16px,5vw,72px) 72px",
-        position:"relative",overflow:"hidden",textAlign:"center"}}>
-        {/* Background mesh */}
-        <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:0,
-          background:`
-            radial-gradient(ellipse 70% 60% at 50% 0%,rgba(0,230,118,0.06) 0%,transparent 65%),
-            radial-gradient(ellipse 50% 40% at 80% 80%,rgba(41,182,246,0.05) 0%,transparent 60%),
-            radial-gradient(ellipse 40% 35% at 20% 70%,rgba(255,109,0,0.04) 0%,transparent 60%)
-          `}}/>
-        {/* Grid overlay */}
-        <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:0,
-          backgroundImage:`linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px)`,
-          backgroundSize:"60px 60px"}}/>
-
-        <div style={{position:"relative",zIndex:1}}>
-          <div className="fu" style={{display:"inline-flex",alignItems:"center",gap:8,
-            background:"rgba(0,230,118,0.07)",border:"1px solid rgba(0,230,118,0.2)",
-            borderRadius:999,padding:"7px 18px",marginBottom:28}}>
-            <span style={{width:7,height:7,borderRadius:"50%",background:G,
-              animation:"glow 2s infinite",display:"block",flexShrink:0}}/>
-            <span style={{fontSize:11,fontWeight:700,color:G,fontFamily:"'JetBrains Mono',monospace",letterSpacing:".06em"}}>
-              FREE FOREVER · 100% ROYALTIES · NO CONTRACTS
-            </span>
-          </div>
-
-          <h1 className="fu d1" style={{fontFamily:"'Syne',sans-serif",
-            fontSize:"clamp(38px,8.5vw,88px)",fontWeight:900,
-            letterSpacing:"-4px",lineHeight:.88,marginBottom:24,maxWidth:880}}>
-            Your Music.<br/>
-            <span style={{color:G}}>Your Money.</span><br/>
-            <span className="gt">Your World.</span>
-          </h1>
-
-          <p className="fu d2" style={{fontSize:"clamp(15px,2vw,18px)",color:SB,lineHeight:1.75,
-            maxWidth:520,margin:"0 auto 36px"}}>
-            Africa's first completely free music distribution platform. Upload once — reach Spotify, Apple Music, Boomplay and 100+ platforms worldwide.
-          </p>
-
-          <div className="fu d3" style={{display:"flex",gap:12,flexWrap:"wrap",justifyContent:"center",marginBottom:52}}>
-            <Btn sz="xl" onClick={()=>go("login")}>Start Distributing Free →</Btn>
-            <Btn v="gl" sz="xl" onClick={()=>go("contact")}>Talk to Us</Btn>
-          </div>
-
-          {/* Stats bar */}
-          <div className="fu d4" style={{display:"flex",gap:"clamp(12px,3vw,40px)",flexWrap:"wrap",
-            justifyContent:"center",padding:"20px 28px",
-            background:"rgba(255,255,255,0.025)",backdropFilter:"blur(20px)",
-            border:`1px solid ${B1}`,borderRadius:20,marginBottom:52,display:"inline-flex"}}>
-            {[["₦3B+","Paid out"],["10M+","Streams"],["2,000+","Artists"],["100+","Platforms"]].map(([v,l])=>(
-              <div key={l} style={{textAlign:"center",padding:"0 8px"}}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(22px,4vw,36px)",
-                  fontWeight:900,letterSpacing:"-1.5px",lineHeight:1}}>{v}</div>
-                <div style={{fontSize:12,color:SB,marginTop:4,fontWeight:500}}>{l}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* DSP ticker */}
-          <div className="fu d5" style={{width:"100%",overflow:"hidden",
-            WebkitMaskImage:"linear-gradient(90deg,transparent,black 10%,black 90%,transparent)"}}>
-            <div style={{display:"flex",gap:10,animation:"ticker 24s linear infinite",width:"max-content"}}>
-              {[...dspPairs,...dspPairs].map(({name,Icon},i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:7,
-                  background:"rgba(255,255,255,0.04)",border:`1px solid ${B1}`,
-                  borderRadius:10,padding:"7px 14px",whiteSpace:"nowrap"}}>
-                  {Icon&&<Icon size={16}/>}
-                  <span style={{fontSize:12,fontWeight:500,color:SB}}>{name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* DSP GRID */}
-      <section style={{padding:"72px clamp(16px,5vw,72px)",background:S,
-        borderTop:`1px solid ${B1}`,borderBottom:`1px solid ${B1}`}}>
-        <div style={{maxWidth:1080,margin:"0 auto",textAlign:"center"}}>
-          <div style={{fontSize:11,fontWeight:700,color:MT,letterSpacing:".12em",
-            textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace",marginBottom:10}}>
-            Distribute to 100+ platforms including
-          </div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:10,justifyContent:"center",marginTop:24}}>
-            {DSP_LIST.map(name=>{
-              const Icon=DSP[name];
-              return(
-                <div key={name} className="hover-lift" style={{display:"flex",alignItems:"center",gap:9,
-                  background:CARD,border:`1px solid ${B1}`,borderRadius:12,
-                  padding:"10px 18px",cursor:"default"}}>
-                  {Icon&&<Icon size={20}/>}
-                  <span style={{fontSize:13,fontWeight:500,color:"#fff"}}>{name}</span>
-                </div>
-              );
-            })}
-            <div style={{display:"flex",alignItems:"center",gap:9,
-              background:CARD,border:`1px solid ${B1}`,borderRadius:12,padding:"10px 18px"}}>
-              <span style={{fontSize:13,fontWeight:600,color:SB}}>+ 89 more</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section style={{padding:"88px clamp(16px,5vw,72px)"}}>
-        <div style={{maxWidth:1060,margin:"0 auto",textAlign:"center"}}>
-          <div style={{fontSize:11,fontWeight:700,color:G,letterSpacing:".12em",
-            textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace",marginBottom:12}}>How It Works</div>
-          <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(26px,4.5vw,48px)",
-            fontWeight:900,letterSpacing:"-2.5px",marginBottom:52}}>
-            Three steps to <span style={{color:G}}>global distribution</span>
-          </h2>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:16}}>
-            {steps.map((s,i)=>(
-              <div key={i} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,
-                borderRadius:20,padding:30,position:"relative",overflow:"hidden",textAlign:"left"}}>
-                <div style={{position:"absolute",top:-10,right:-6,fontFamily:"'Syne',sans-serif",
-                  fontSize:88,fontWeight:900,color:`${s.c}06`,lineHeight:1,userSelect:"none"}}>{s.n}</div>
-                <div style={{width:48,height:48,borderRadius:14,background:`${s.c}12`,
-                  border:`1px solid ${s.c}20`,display:"flex",alignItems:"center",justifyContent:"center",
-                  fontSize:22,marginBottom:18,fontFamily:"'Syne',sans-serif",fontWeight:900,
-                  color:s.c,flexShrink:0}}>{s.n}</div>
-                <div style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,
-                  letterSpacing:"-.5px",marginBottom:10}}>{s.t}</div>
-                <p style={{fontSize:14,color:SB,lineHeight:1.7}}>{s.d}</p>
-                <div style={{position:"absolute",bottom:0,left:0,right:0,height:2,
-                  background:`linear-gradient(90deg,${s.c},transparent)`,opacity:.7}}/>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* FEATURES */}
-      <section style={{padding:"80px clamp(16px,5vw,72px)",background:S,
-        borderTop:`1px solid ${B1}`,borderBottom:`1px solid ${B1}`}}>
-        <div style={{maxWidth:1060,margin:"0 auto"}}>
-          <div style={{textAlign:"center",marginBottom:52}}>
-            <div style={{fontSize:11,fontWeight:700,color:BL,letterSpacing:".12em",
-              textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace",marginBottom:12}}>Platform Features</div>
-            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(24px,4vw,46px)",
-              fontWeight:900,letterSpacing:"-2px"}}>
-              Built for African artists.<br/><span style={{color:BL}}>By people who understand.</span>
-            </h2>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(290px,1fr))",gap:14}}>
-            {feats.map((f,i)=>(
-              <div key={i} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,
-                borderRadius:18,padding:26,display:"flex",gap:18,alignItems:"flex-start"}}>
-                <div style={{width:46,height:46,borderRadius:13,background:`${f.a}10`,
-                  border:`1px solid ${f.a}18`,display:"flex",alignItems:"center",justifyContent:"center",
-                  fontSize:20,fontWeight:900,color:f.a,fontFamily:"'Syne',sans-serif",flexShrink:0}}>{f.i}</div>
-                <div>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:800,
-                    letterSpacing:"-.3px",marginBottom:8}}>{f.t}</div>
-                  <p style={{fontSize:13.5,color:SB,lineHeight:1.65}}>{f.d}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* COMPARISON TABLE */}
-      <section style={{padding:"88px clamp(16px,5vw,72px)"}}>
-        <div style={{maxWidth:820,margin:"0 auto"}}>
-          <div style={{textAlign:"center",marginBottom:44}}>
-            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(22px,4vw,40px)",
-              fontWeight:900,letterSpacing:"-2px",marginBottom:10}}>The honest comparison</h2>
-            <p style={{fontSize:14.5,color:SB}}>Why artists are switching to FamousTechPlay.</p>
-          </div>
-          <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-            <div style={{background:CARD,border:`1px solid ${B2}`,borderRadius:20,overflow:"hidden",minWidth:440}}>
-              <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",
-                background:C2,borderBottom:`1px solid ${B1}`,padding:"14px 20px",gap:12}}>
-                {["Feature",<span style={{color:G,fontFamily:"'JetBrains Mono',monospace"}}>FamousTechPlay</span>,"DistroKid","TuneCore"].map((h,i)=>(
-                  <div key={i} style={{fontSize:11,fontWeight:700,color:i===0?MT:"#fff",
-                    fontFamily:"'JetBrains Mono',monospace",textAlign:i>0?"center":"left"}}>{h}</div>
-                ))}
-              </div>
-              {compare.map((row,i)=>(
-                <div key={i} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",
-                  padding:"13px 20px",gap:12,
-                  borderBottom:i<compare.length-1?`1px solid ${B1}`:undefined,
-                  background:i%2===0?"transparent":"rgba(255,255,255,0.018)"}}>
-                  <div style={{fontSize:13.5,fontWeight:500,color:"#fff"}}>{row[0]}</div>
-                  {row.slice(1).map((v,j)=>(
-                    <div key={j} style={{textAlign:"center",fontSize:13,fontWeight:j===0?700:400,
-                      color:j===0?G:v.startsWith("✗")?MT:SB}}>{v}</div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* TESTIMONIALS */}
-      <section style={{padding:"80px clamp(16px,5vw,72px)",background:S,
-        borderTop:`1px solid ${B1}`,borderBottom:`1px solid ${B1}`}}>
-        <div style={{maxWidth:1060,margin:"0 auto"}}>
-          <div style={{textAlign:"center",marginBottom:48}}>
-            <div style={{fontSize:11,fontWeight:700,color:OR,letterSpacing:".12em",
-              textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace",marginBottom:12}}>Artist Stories</div>
-            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(24px,4vw,44px)",
-              fontWeight:900,letterSpacing:"-2px"}}>Trusted by artists <span style={{color:OR}}>across Africa</span></h2>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:14}}>
-            {testi.map((t,i)=>(
-              <div key={i} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,
-                borderRadius:20,padding:28,position:"relative",overflow:"hidden"}}>
-                <div style={{position:"absolute",top:-4,left:20,fontSize:56,
-                  color:t.c,fontFamily:"Georgia,serif",lineHeight:1,opacity:.4}}>"</div>
-                <p style={{fontSize:14,color:SB,lineHeight:1.8,marginBottom:22,
-                  marginTop:28,fontStyle:"italic",position:"relative"}}>{t.q}</p>
-                <div style={{display:"flex",alignItems:"center",gap:12,
-                  borderTop:`1px solid ${B1}`,paddingTop:18}}>
-                  <div style={{width:40,height:40,borderRadius:11,
-                    background:`linear-gradient(135deg,${t.c}20,${t.c}08)`,
-                    color:t.c,fontWeight:800,fontSize:13,display:"flex",alignItems:"center",
-                    justifyContent:"center",border:`1px solid ${t.c}18`,
-                    fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{t.av}</div>
-                  <div>
-                    <div style={{fontWeight:700,fontSize:14}}>{t.name}</div>
-                    <div style={{fontSize:11,color:MT,marginTop:2,fontFamily:"'JetBrains Mono',monospace"}}>{t.g}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section style={{padding:"72px clamp(16px,5vw,72px) 88px"}}>
-        <div style={{maxWidth:740,margin:"0 auto",textAlign:"center",
-          background:`linear-gradient(145deg,${CARD},${C2})`,
-          border:`1px solid ${B2}`,borderRadius:28,
-          padding:"52px clamp(20px,5vw,64px)",position:"relative",overflow:"hidden",
-          animation:"borderGlow 4s ease-in-out infinite"}}>
-          <div style={{position:"absolute",top:-60,left:"50%",transform:"translateX(-50%)",
-            width:320,height:320,borderRadius:"50%",
-            background:`radial-gradient(${G}08,transparent 70%)`,pointerEvents:"none"}}/>
-          <div style={{position:"relative",zIndex:1}}>
-            <div style={{display:"inline-flex",alignItems:"center",gap:8,background:`${G}10`,
-              border:`1px solid ${G}22`,borderRadius:999,padding:"6px 16px",marginBottom:20}}>
-              <span style={{fontSize:11,fontWeight:700,color:G,fontFamily:"'JetBrains Mono',monospace"}}>JOIN 2,000+ ARTISTS</span>
-            </div>
-            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(24px,5vw,48px)",
-              fontWeight:900,letterSpacing:"-2.5px",lineHeight:1,marginBottom:16}}>
-              Ready to take your music <span className="gt">global?</span>
-            </h2>
-            <p style={{fontSize:15,color:SB,lineHeight:1.7,marginBottom:30,maxWidth:380,margin:"0 auto 30px"}}>
-              Free forever. No credit card. No contracts. Just your music — everywhere.
-            </p>
-            <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginBottom:20}}>
-              <Btn sz="xl" onClick={()=>go("login")}>Get Started Free →</Btn>
-              <Btn v="gl" sz="xl" onClick={()=>go("contact")}>Talk to Us</Btn>
-            </div>
-            <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap"}}>
-              {["✓ Free forever","✓ 100% royalties","✓ No contracts","✓ Nigerian support"].map(t=>(
-                <span key={t} style={{fontSize:12.5,color:SB}}>{t}</span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-};
-
-// ── CONTACT ────────────────────────────────────────────────────────────────
-const Contact=()=>{
-  const[f,sf]=useState({name:"",email:"",topic:"",msg:""});
-  const[sent,setSent]=useState(false);
-  const[ld,setLd]=useState(false);
-  const[mob,setMob]=useState(window.innerWidth<768);
-  const[openFaq,setOpenFaq]=useState(null);
-  useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  const up=(k,v)=>sf(p=>({...p,[k]:v}));
-  const L=({c})=><div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>{c}</div>;
-  const faqs=[
-    {q:"How long does distribution take?",a:"Your music typically goes live within 2–3 business days after approval."},
-    {q:"Is it really free?",a:"Yes — completely free, forever. No monthly fees. We keep 0% of your royalties."},
-    {q:"How do I withdraw earnings?",a:"Request payouts to your Nigerian bank, Opay, Palmpay, Kuda, Wise or PayPal."},
-    {q:"Do you support Afrobeats?",a:"Absolutely. Built for Afrobeats, Afropop, Highlife, Amapiano, Alté and all African genres."},
-  ];
-  return(
-    <div style={{minHeight:"100vh",paddingTop:90}}>
-      <section style={{padding:"52px clamp(16px,5vw,72px) 56px",textAlign:"center",
-        background:`linear-gradient(180deg,${S},${BG})`,borderBottom:`1px solid ${B1}`}}>
-        <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(28px,5.5vw,52px)",
-          fontWeight:900,letterSpacing:"-2.5px",lineHeight:1,marginBottom:12}}>
-          Get in <span style={{color:G}}>touch</span>
-        </h1>
-        <p style={{fontSize:15,color:SB,lineHeight:1.7,maxWidth:420,margin:"0 auto"}}>Real humans. Fast responses. We're here to help you distribute and grow.</p>
-      </section>
-      <div style={{maxWidth:1060,margin:"0 auto",padding:"56px clamp(16px,5vw,56px) 88px"}}>
-        <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"minmax(230px,1fr) minmax(260px,1.2fr)",gap:28,alignItems:"start"}}>
-          <div>
-            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,marginBottom:16}}>Reach us directly</h2>
-            {[{i:"✉",l:"Email",v:"support@famoustechplay.com",s:"Response within 24h",c:G},
-              {i:"💬",l:"WhatsApp",v:"+234 800 FTP HELP",s:"Mon–Sat, 9am–8pm WAT",c:"#25D366"},
-              {i:"📍",l:"Office",v:"Victoria Island, Lagos",s:"By appointment only",c:BL}].map((c,i)=>(
-              <div key={i} className="hover-glow" style={{display:"flex",gap:14,padding:"14px 16px",
-                background:CARD,border:`1px solid ${B1}`,borderRadius:14,marginBottom:10}}>
-                <div style={{width:40,height:40,borderRadius:11,background:`${c.c}10`,
-                  border:`1px solid ${c.c}18`,display:"flex",alignItems:"center",
-                  justifyContent:"center",fontSize:18,flexShrink:0}}>{c.i}</div>
-                <div>
-                  <div style={{fontSize:10,fontWeight:700,color:MT,letterSpacing:".08em",
-                    textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace",marginBottom:3}}>{c.l}</div>
-                  <div style={{fontSize:13.5,fontWeight:600,marginBottom:2}}>{c.v}</div>
-                  <div style={{fontSize:11.5,color:MT}}>{c.s}</div>
-                </div>
-              </div>
-            ))}
-            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:18,fontWeight:800,margin:"22px 0 12px"}}>Follow us</h2>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:9}}>
-              {[["📸","Instagram","@famoustechplay","#E1306C"],["𝕏","X / Twitter","@famoustechplay","#1DA1F2"],
-                ["🎵","TikTok","@famoustechplay","#FF0050"],["▶","YouTube","FamousTechPlay","#FF0000"]].map(([ic,n,h,c])=>(
-                <div key={n} className="hover-glow" style={{display:"flex",gap:10,padding:"11px 13px",
-                  background:CARD,border:`1px solid ${B1}`,borderRadius:12,alignItems:"center",cursor:"pointer"}}>
-                  <div style={{width:32,height:32,borderRadius:8,background:`${c}12`,
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:14,fontWeight:700,color:c,border:`1px solid ${c}18`,flexShrink:0}}>{ic}</div>
-                  <div style={{minWidth:0}}>
-                    <div style={{fontSize:12.5,fontWeight:700}}>{n}</div>
-                    <div style={{fontSize:10,color:MT,fontFamily:"'JetBrains Mono',monospace",marginTop:1}}>{h}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:18,fontWeight:800,margin:"22px 0 12px"}}>FAQ</h2>
-            {faqs.map((fq,i)=>(
-              <div key={i} style={{background:CARD,border:`1px solid ${B1}`,borderRadius:13,marginBottom:8,overflow:"hidden"}}>
-                <button onClick={()=>setOpenFaq(openFaq===i?null:i)}
-                  style={{width:"100%",padding:"14px 18px",display:"flex",justifyContent:"space-between",
-                    alignItems:"center",cursor:"pointer",background:"none",border:"none",
-                    textAlign:"left",color:"#fff",fontFamily:"inherit"}}>
-                  <span style={{fontSize:14,fontWeight:600,flex:1,paddingRight:10}}>{fq.q}</span>
-                  <span style={{fontSize:20,color:SB,transform:openFaq===i?"rotate(45deg)":"none",
-                    transition:"transform .2s",flexShrink:0,display:"inline-block"}}>+</span>
-                </button>
-                {openFaq===i&&<div style={{padding:"0 18px 14px",fontSize:13.5,color:SB,lineHeight:1.7}}>{fq.a}</div>}
-              </div>
-            ))}
-          </div>
-          <div>
-            {sent?(
-              <div style={{background:CARD,border:`1px solid ${G}22`,borderRadius:20,
-                padding:"36px 24px",textAlign:"center"}}>
-                <div style={{fontSize:44,marginBottom:14}}>✅</div>
-                <h3 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:900,marginBottom:8}}>Message Sent!</h3>
-                <p style={{fontSize:14,color:SB,lineHeight:1.7,marginBottom:20}}>Our team will get back to you within 24 hours.</p>
-                <Btn v="g" onClick={()=>{setSent(false);sf({name:"",email:"",topic:"",msg:""});}}>Send Another</Btn>
-              </div>
-            ):(
-              <div style={{background:CARD,border:`1px solid ${B1}`,borderRadius:20,
-                padding:"24px 24px 28px",position:"relative",overflow:"hidden"}}>
-                <div style={{position:"absolute",top:0,left:0,right:0,height:2,
-                  background:`linear-gradient(90deg,${G},${BL},${OR})`}}/>
-                <h3 style={{fontFamily:"'Syne',sans-serif",fontSize:17,fontWeight:800,marginBottom:18,paddingTop:6}}>Send a Message</h3>
-                <div style={{display:"flex",flexDirection:"column",gap:13}}>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:11}}>
-                    <div><L c="Name"/><input value={f.name} onChange={e=>up("name",e.target.value)} placeholder="Ada Okonkwo"/></div>
-                    <div><L c="Email"/><input type="email" value={f.email} onChange={e=>up("email",e.target.value)} placeholder="ada@email.com"/></div>
-                  </div>
-                  <div><L c="Topic"/>
-                    <select value={f.topic} onChange={e=>up("topic",e.target.value)}>
-                      <option value="">Select a topic...</option>
-                      {["Distribution Help","Payout Question","Account Access","Technical Issue","Partnership","General"].map(o=><option key={o}>{o}</option>)}
-                    </select>
-                  </div>
-                  <div><L c="Message"/><textarea rows={5} value={f.msg} onChange={e=>up("msg",e.target.value)} placeholder="How can we help?"/></div>
-                  <Btn full sz="lg" disabled={!f.name||!f.email||!f.msg||ld}
-                    onClick={()=>{if(!f.name||!f.email||!f.msg)return;setLd(true);setTimeout(()=>{setLd(false);setSent(true);},1300);}}>
-                    {ld?<><span className="spinning" style={{width:14,height:14,border:"2px solid rgba(0,0,0,.3)",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block"}}/>Sending…</>:"Send Message →"}
-                  </Btn>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ── CAREERS ─────────────────────────────────────────────────────────────────
-const Careers=()=>{
-  const[app,setApp]=useState(null);
-  const[f,sf]=useState({name:"",email:"",exp:"",cover:""});
-  const[sent,setSent]=useState(false);
-  const[ld,setLd]=useState(false);
-  const up=(k,v)=>sf(p=>({...p,[k]:v}));
-  const roles=[
-    {id:1,t:"Backend Engineer",d:"Engineering",l:"Lagos/Remote",a:G,desc:"Build and scale our distribution infrastructure with Node.js, PostgreSQL, Redis and AWS.",sk:["Node.js","PostgreSQL","AWS"]},
-    {id:2,t:"Product Designer",d:"Design",l:"Lagos/Remote",a:BL,desc:"Design beautiful experiences for artists — from first upload to million-stream catalogues.",sk:["Figma","User Research","Prototyping"]},
-    {id:3,t:"Artist Relations",d:"Partnerships",l:"Lagos",a:OR,desc:"Be the face of FamousTechPlay to Nigeria's top independent artists.",sk:["Music Industry","Afrobeats","Relationship Mgmt"]},
-    {id:4,t:"Marketing Lead",d:"Marketing",l:"Lagos",a:BL,desc:"Own our growth in Nigeria and West Africa. Lead campaigns, manage socials.",sk:["Growth","Social Media","Content"]},
-    {id:5,t:"Support Specialist",d:"Support",l:"Lagos/Remote",a:OR,desc:"Help artists solve problems fast and feel supported at every step.",sk:["Communication","CRM","Problem Solving"]},
-  ];
-  const L=({c})=><div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>{c}</div>;
-  const r=roles.find(x=>x.id===app)||{t:"Open Application",d:"Any",a:OR,desc:"Tell us why you'd be a great fit.",sk:[]};
-
-  if(sent)return(
-    <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",
-      flexDirection:"column",textAlign:"center",padding:20,paddingTop:88}}>
-      <div style={{fontSize:56,marginBottom:16,animation:"float 3s ease-in-out infinite"}}>🎉</div>
-      <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:30,fontWeight:900,letterSpacing:"-1px",marginBottom:12}}>Application Received!</h2>
-      <p style={{fontSize:15,color:SB,lineHeight:1.7,maxWidth:360,marginBottom:24}}>Our team will reach out within 5–7 business days.</p>
-      <Btn v="g" onClick={()=>{setSent(false);setApp(null);sf({name:"",email:"",exp:"",cover:""});}}>← View All Roles</Btn>
-    </div>
-  );
-
-  if(app!==null)return(
-    <div style={{minHeight:"100vh",padding:"90px clamp(16px,5vw,64px) 80px"}}>
-      <div style={{maxWidth:580,margin:"0 auto"}}>
-        <button onClick={()=>setApp(null)}
-          style={{fontSize:13.5,color:SB,marginBottom:22,cursor:"pointer",display:"flex",
-            alignItems:"center",gap:7,background:"none",border:"none",fontFamily:"inherit",
-            fontWeight:500,transition:"color .14s"}}
-          onMouseEnter={e=>e.currentTarget.style.color="#fff"}
-          onMouseLeave={e=>e.currentTarget.style.color=SB}>← Back to careers</button>
-        <div style={{background:CARD,border:`1px solid ${B2}`,borderRadius:20,padding:22,
-          marginBottom:16,borderTop:`3px solid ${r.a}`}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-            flexWrap:"wrap",gap:10,marginBottom:10}}>
-            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:900}}>{r.t}</h2>
-            <span style={{background:`${r.a}10`,color:r.a,border:`1px solid ${r.a}20`,
-              borderRadius:999,padding:"4px 12px",fontSize:11,fontWeight:700,
-              fontFamily:"'JetBrains Mono',monospace"}}>{r.d}</span>
-          </div>
-          <p style={{fontSize:13.5,color:SB,lineHeight:1.65}}>{r.desc}</p>
-        </div>
-        <div style={{background:CARD,border:`1px solid ${B1}`,borderRadius:20,padding:22}}>
-          <h3 style={{fontFamily:"'Syne',sans-serif",fontSize:17,fontWeight:800,marginBottom:18}}>Your Application</h3>
-          <div style={{display:"flex",flexDirection:"column",gap:13}}>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:11}}>
-              <div><L c="Full Name"/><input value={f.name} onChange={e=>up("name",e.target.value)} placeholder="Ada Okonkwo"/></div>
-              <div><L c="Email"/><input type="email" value={f.email} onChange={e=>up("email",e.target.value)} placeholder="ada@email.com"/></div>
-            </div>
-            <div><L c="Applying for"/><input value={r.t} disabled style={{opacity:.5}}/></div>
-            <div><L c="Years of Experience"/>
-              <select value={f.exp} onChange={e=>up("exp",e.target.value)}>
-                <option value="">Select...</option>
-                {["0–1 years","1–3 years","3–5 years","5–10 years","10+ years"].map(o=><option key={o}>{o}</option>)}
-              </select>
-            </div>
-            <div><L c="Why FamousTechPlay?"/><textarea rows={4} value={f.cover} onChange={e=>up("cover",e.target.value)} placeholder="Tell us about yourself and why you want to join..."/></div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              <Btn v="g" onClick={()=>setApp(null)} full>Cancel</Btn>
-              <Btn full disabled={!f.name||!f.email||ld}
-                onClick={()=>{if(!f.name||!f.email)return;setLd(true);setTimeout(()=>{setLd(false);setSent(true);},1400);}}>
-                {ld?<><span className="spinning" style={{width:14,height:14,border:"2px solid rgba(0,0,0,.3)",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block"}}/>Sending…</>:"Submit →"}
-              </Btn>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  return(
-    <div style={{minHeight:"100vh",paddingTop:90}}>
-      <section style={{padding:"52px clamp(16px,5vw,72px) 60px",textAlign:"center",
-        background:`linear-gradient(180deg,${S},${BG})`,borderBottom:`1px solid ${B1}`}}>
-        <div style={{display:"inline-flex",alignItems:"center",gap:8,background:`${BL}10`,
-          border:`1px solid ${BL}22`,borderRadius:999,padding:"6px 16px",marginBottom:16}}>
-          <span style={{width:5,height:5,borderRadius:"50%",background:BL,flexShrink:0}}/>
-          <span style={{fontSize:11,fontWeight:700,color:BL,fontFamily:"'JetBrains Mono',monospace"}}>{roles.length} OPEN ROLES</span>
-        </div>
-        <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(28px,5.5vw,54px)",
-          fontWeight:900,letterSpacing:"-2.5px",lineHeight:.95,marginBottom:14}}>
-          Build the future of<br/><span className="gt">African music</span>
-        </h1>
-        <p style={{fontSize:15,color:SB,lineHeight:1.75,maxWidth:420,margin:"0 auto"}}>Join a small, ambitious team putting African artists on every stage in the world.</p>
-      </section>
-      <section style={{padding:"56px clamp(16px,5vw,72px) 88px"}}>
-        <div style={{maxWidth:900,margin:"0 auto"}}>
-          <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,30px)",fontWeight:900,
-            letterSpacing:"-.8px",marginBottom:22}}>Open Positions</h2>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {roles.map(r=>(
-              <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,
-                borderRadius:16,padding:"20px 22px",borderLeft:`3px solid ${r.a}`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                  flexWrap:"wrap",gap:12}}>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",alignItems:"center",gap:9,flexWrap:"wrap",marginBottom:7}}>
-                      <h3 style={{fontFamily:"'Syne',sans-serif",fontSize:16.5,fontWeight:800}}>{r.t}</h3>
-                      <span style={{background:`${r.a}10`,color:r.a,border:`1px solid ${r.a}18`,
-                        borderRadius:999,padding:"3px 10px",fontSize:10.5,fontWeight:700,
-                        fontFamily:"'JetBrains Mono',monospace"}}>{r.d}</span>
-                      <span style={{fontSize:11.5,color:MT,fontFamily:"'JetBrains Mono',monospace"}}>{r.l}</span>
-                    </div>
-                    <p style={{fontSize:13.5,color:SB,lineHeight:1.6,marginBottom:10}}>{r.desc}</p>
-                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                      {r.sk.map(sk=>(
-                        <span key={sk} style={{fontSize:10.5,color:MT,background:`${r.a}07`,
-                          borderRadius:6,padding:"3px 8px",border:`1px solid ${r.a}12`,
-                          fontFamily:"'JetBrains Mono',monospace"}}>{sk}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <Btn onClick={()=>setApp(r.id)} sz="sm" sx={{flexShrink:0}}>Apply →</Btn>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div style={{marginTop:16,background:CARD,border:`1px solid ${B2}`,borderRadius:16,
-            padding:22,textAlign:"center",borderTop:`2px solid ${OR}`}}>
-            <div style={{fontSize:24,marginBottom:8}}>💌</div>
-            <h3 style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:800,marginBottom:6}}>Don't see your role?</h3>
-            <p style={{fontSize:13.5,color:SB,lineHeight:1.6,marginBottom:14}}>We're always looking for exceptional people who care about African music.</p>
-            <Btn v="o" onClick={()=>setApp(0)}>Send Open Application →</Btn>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-};
-
-// ── LOGIN ────────────────────────────────────────────────────────────────────
-const Login=({go,onLogin})=>{
-  const[mode,setMode]=useState("signin");
-  const[email,setEmail]=useState("");
-  const[pass,setPass]=useState("");
-  const[name,setName]=useState("");
-  const[err,setErr]=useState("");
-  const[msg,setMsg]=useState("");
-  const[ld,setLd]=useState(false);
-  const[mob,setMob]=useState(window.innerWidth<768);
-  useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-
-  const doSignIn=async()=>{
-    if(!email||!pass)return;
-    setLd(true);setErr("");
-    try{
-      const{data,error}=await supabase.auth.signInWithPassword({email,password:pass});
-      if(error){setErr(error.message||"Invalid email or password.");setLd(false);return;}
-      const user=data.user;
-      // Fetch profile from profiles table
-      const{data:profile}=await supabase.from("profiles").select("*").eq("id",user.id).single();
-      const userData={
-        id:user.id,
-        email:user.email,
-        name:profile?.name||user.user_metadata?.name||email.split("@")[0],
-        role:profile?.role||"artist",
-        plan:profile?.plan||"Free",
-        av:profile?.av||(profile?.name||user.user_metadata?.name||"U").slice(0,2).toUpperCase(),
-      };
-      onLogin(userData);
-    }catch(e){
-      setErr(e?.message||JSON.stringify(e)||"Connection error. Please try again.");
-      setLd(false);
-    }
-  };
-
-  const doSignUp=async()=>{
-    if(!email||!pass||!name)return;
-    if(pass.length<6){setErr("Password must be at least 6 characters.");return;}
-    setLd(true);setErr("");
-    try{
-      const{data,error}=await supabase.auth.signUp({email,password:pass,options:{data:{name}}});
-      if(error){setErr(error.message||"Could not create account.");setLd(false);return;}
-      if(data?.user){
-        const{error:profErr}=await supabase.from("profiles").upsert({
-          id:data.user.id,
-          email,
-          name,
-          role:"artist",
-          plan:"Free",
-          av:name.slice(0,2).toUpperCase()
-        });
-        if(profErr){setErr("Account created but profile failed: "+profErr.message);setLd(false);return;}
-      }
-      setLd(false);
+  const handleSignUp = async () => {
+    setErr(""); setMsg("");
+    if (!name || !email || !pass) { setErr("Please fill in all fields."); return; }
+    if (pass.length < 6) { setErr("Password must be at least 6 characters."); return; }
+    setBusy(true);
+    const { data, error } = await supabase.auth.signUp({ email, password: pass, options: { data: { name } } });
+    if (error) { setErr(error.message); setBusy(false); return; }
+    if (data.user) {
+      await supabase.from("profiles").upsert({
+        id: data.user.id, email, name,
+        role: "artist", plan: "Free",
+        av: initials(name), created_at: new Date().toISOString()
+      });
       setMsg("✅ Account created! You can now sign in.");
       setMode("signin");
-    }catch(e){
-      setErr(e?.message||JSON.stringify(e)||"Connection error. Please try again.");
-      setLd(false);
     }
+    setBusy(false);
   };
 
-  return(
-    <div style={{minHeight:"100vh",display:"flex",flexDirection:mob?"column":"row",overflow:"hidden"}}>
-      {!mob&&(
-        <div style={{flex:"0 0 46%",background:S,display:"flex",flexDirection:"column",
-          justifyContent:"center",padding:"60px clamp(32px,5vw,72px)",
-          position:"relative",overflow:"hidden",borderRight:`1px solid ${B1}`}}>
-          <div style={{position:"absolute",top:-100,right:-80,width:400,height:400,borderRadius:"50%",background:`radial-gradient(${G}07,transparent 65%)`,pointerEvents:"none"}}/>
-          <div style={{position:"absolute",bottom:-80,left:-60,width:300,height:300,borderRadius:"50%",background:`radial-gradient(${BL}05,transparent 65%)`,pointerEvents:"none"}}/>
-          <div style={{position:"relative",zIndex:1}}>
-            <div style={{cursor:"pointer",marginBottom:52}} onClick={()=>go("home")}><Logo sz={28}/></div>
-            <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(28px,3.5vw,44px)",fontWeight:900,letterSpacing:"-2px",lineHeight:1.05,marginBottom:16}}>
-              Distribute your music.<br/><span style={{color:G}}>Keep everything.</span>
-            </h1>
-            <p style={{fontSize:14.5,color:SB,lineHeight:1.75,marginBottom:36,maxWidth:340}}>
-              Join 2,000+ Nigerian artists already earning on Spotify, Boomplay, Apple Music & 97 more platforms — completely free.
-            </p>
-            {[["🎵","100+ platforms worldwide"],["₦","Multi-currency payouts"],["🔒","100% royalties kept"],["⚡","Live in 2–3 business days"]].map(([ic,t])=>(
-              <div key={t} style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-                <div style={{width:32,height:32,borderRadius:9,background:`${G}10`,border:`1px solid ${G}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>{ic}</div>
-                <span style={{fontSize:14,color:SB}}>{t}</span>
-              </div>
-            ))}
-            <div style={{display:"flex",gap:8,marginTop:32,flexWrap:"wrap"}}>
-              {["Spotify","Apple Music","Boomplay","Audiomack"].map(name=>{
-                const Icon=DSP[name];
-                return(
-                  <div key={name} style={{width:36,height:36,borderRadius:10,background:B1,border:`1px solid ${B1}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    {Icon&&<Icon size={18}/>}
-                  </div>
-                );
-              })}
-              <div style={{width:36,height:36,borderRadius:10,background:B1,border:`1px solid ${B1}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:MT,fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>+97</div>
-            </div>
-          </div>
-        </div>
-      )}
-      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:mob?"88px 20px 40px":"44px 32px",minHeight:mob?"100vh":undefined,position:"relative"}}>
-        <div style={{position:"absolute",inset:0,background:`radial-gradient(ellipse 60% 50% at 50% 50%,${G}04,transparent 70%)`,pointerEvents:"none"}}/>
-        <div style={{width:"100%",maxWidth:400,position:"relative",zIndex:1}}>
-          {mob&&<div style={{display:"flex",justifyContent:"center",marginBottom:32}}><Logo sz={26} onClick={()=>go("home")}/></div>}
-          <button onClick={()=>go("home")}
-            style={{fontSize:13,color:MT,marginBottom:28,cursor:"pointer",display:"flex",alignItems:"center",gap:6,background:"none",border:"none",fontFamily:"inherit",fontWeight:500,transition:"color .14s"}}
-            onMouseEnter={e=>e.currentTarget.style.color=SB}
-            onMouseLeave={e=>e.currentTarget.style.color=MT}>← Back to website</button>
+  const handleSignIn = async () => {
+    setErr(""); setMsg("");
+    if (!email || !pass) { setErr("Please enter your email and password."); return; }
+    setBusy(true);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    if (error) { setErr(error.message); setBusy(false); return; }
+    const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
+    onLogin({
+      id:    data.user.id,
+      email: data.user.email,
+      name:  profile?.name  || data.user.user_metadata?.name || email.split("@")[0],
+      role:  profile?.role  || "artist",
+      plan:  profile?.plan  || "Free",
+      av:    profile?.av    || initials(profile?.name || email),
+    });
+    setBusy(false);
+  };
 
-          {/* Tab switcher */}
-          <div style={{display:"flex",background:C2,borderRadius:14,padding:4,marginBottom:28,border:`1px solid ${B1}`}}>
-            {[["signin","Sign In"],["signup","Create Account"]].map(([m,l])=>(
-              <button key={m} onClick={()=>{setMode(m);setErr("");setMsg("");}}
-                style={{flex:1,padding:"10px",borderRadius:11,fontSize:13.5,fontWeight:700,cursor:"pointer",border:"none",fontFamily:"inherit",transition:"all .18s",
-                  background:mode===m?"rgba(255,255,255,0.08)":"transparent",
-                  color:mode===m?"#fff":SB}}>
-                {l}
-              </button>
-            ))}
-          </div>
-
-          <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:26,fontWeight:900,letterSpacing:"-1px",marginBottom:6}}>
-            {mode==="signin"?"Welcome back":"Join FamousTechPlay"}
+  return (
+    <div style={{ ...css.page, display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh" }}>
+      <div style={{ width:"100%", maxWidth:440, padding:24 }}>
+        <div style={{ textAlign:"center", marginBottom:36 }}><Logo size={32}/></div>
+        <div style={{ ...css.card }}>
+          <h2 style={{ margin:"0 0 6px", fontSize:24, fontWeight:800 }}>
+            {mode === "signin" ? "Welcome back" : "Create your account"}
           </h2>
-          <p style={{fontSize:14,color:SB,marginBottom:24}}>
-            {mode==="signin"?"Sign in to your account":"Create your free artist account"}
+          <p style={{ color:MUTED, fontSize:14, marginBottom:24 }}>
+            {mode === "signin" ? "Sign in to your FamousTechPlay account" : "Start distributing your music worldwide — free"}
           </p>
 
-          {msg&&(
-            <div style={{background:"rgba(0,230,118,.07)",border:`1px solid ${G}25`,borderRadius:12,padding:"11px 15px",fontSize:13.5,color:G,marginBottom:18,lineHeight:1.6}}>{msg}</div>
-          )}
-          {err&&(
-            <div style={{background:"rgba(255,23,68,.07)",border:"1px solid rgba(255,23,68,.18)",borderRadius:12,padding:"11px 15px",fontSize:13.5,color:"#FF1744",marginBottom:18,lineHeight:1.5}}>{err}</div>
-          )}
+          {err && <div style={{ background:"rgba(255,23,68,0.1)", border:"1px solid rgba(255,23,68,0.3)", borderRadius:8, padding:"12px 16px", color:"#FF6B6B", fontSize:14, marginBottom:16 }}>{err}</div>}
+          {msg && <div style={{ background:"rgba(0,230,118,0.1)", border:"1px solid rgba(0,230,118,0.3)", borderRadius:8, padding:"12px 16px", color:G, fontSize:14, marginBottom:16 }}>{msg}</div>}
 
-          <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            {mode==="signup"&&(
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            {mode === "signup" && (
               <div>
-                <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Your Name</div>
-                <input value={name} onChange={e=>setName(e.target.value)} placeholder="Ada Okonkwo"/>
+                <label style={css.label}>Full Name</label>
+                <input style={css.input} placeholder="Your artist name" value={name} onChange={e=>setName(e.target.value)}/>
               </div>
             )}
             <div>
-              <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Email</div>
-              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com"
-                onKeyDown={e=>e.key==="Enter"&&(mode==="signin"?doSignIn():doSignUp())}/>
+              <label style={css.label}>Email</label>
+              <input style={css.input} type="email" placeholder="you@email.com" value={email} onChange={e=>setEmail(e.target.value)}/>
             </div>
             <div>
-              <div style={{fontSize:12.5,fontWeight:600,color:SB,marginBottom:7}}>Password</div>
-              <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••"
-                onKeyDown={e=>e.key==="Enter"&&(mode==="signin"?doSignIn():doSignUp())}/>
-              {mode==="signup"&&<div style={{fontSize:11,color:MT,marginTop:5}}>Minimum 6 characters</div>}
+              <label style={css.label}>Password</label>
+              <input style={css.input} type="password" placeholder="••••••••" value={pass} onChange={e=>setPass(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&(mode==="signin"?handleSignIn():handleSignUp())}/>
             </div>
-            <Btn full sz="lg"
-              disabled={mode==="signin"?(!email||!pass||ld):(!email||!pass||!name||ld)}
-              onClick={mode==="signin"?doSignIn:doSignUp}>
-              {ld?(
-                <><span className="spinning" style={{width:14,height:14,border:"2px solid rgba(0,0,0,.3)",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block"}}/>
-                {mode==="signin"?"Signing in…":"Creating account…"}</>
-              ):mode==="signin"?"Sign In →":"Create Free Account →"}
-            </Btn>
-          </div>
-
-          {mode==="signin"&&(
-            <>
-              <div style={{margin:"22px 0",display:"flex",alignItems:"center",gap:10}}>
-                <div style={{flex:1,height:1,background:B1}}/>
-                <span style={{fontSize:10.5,color:MT,fontFamily:"'JetBrains Mono',monospace",letterSpacing:".05em"}}>OR</span>
-                <div style={{flex:1,height:1,background:B1}}/>
-              </div>
-              <p style={{fontSize:12.5,color:MT,textAlign:"center"}}>
-                Don't have an account?{" "}
-                <span onClick={()=>{setMode("signup");setErr("");}} style={{color:G,cursor:"pointer",fontWeight:600}}>Sign up free →</span>
-              </p>
-            </>
-          )}
-          {mode==="signup"&&(
-            <p style={{fontSize:12,color:MT,marginTop:16,textAlign:"center",lineHeight:1.6}}>
-              By creating an account you agree to our Terms of Service. Already have one?{" "}
-              <span onClick={()=>{setMode("signin");setErr("");}} style={{color:G,cursor:"pointer",fontWeight:600}}>Sign in</span>
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ArtistDash=({user,onLogout})=>{
-  const[tab,setTab]=useState("overview");
-  const[mob,setMob]=useState(window.innerWidth<768);
-  const[rels,setRels]=useState([]);
-  const[pays,setPays]=useState([]);
-  const[loading,setLoading]=useState(true);
-  useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  useEffect(()=>{
-    const fetchData=async()=>{
-      setLoading(true);
-      const{data:relData}=await supabase.from("releases").select("*").eq("user_id",user.id).order("created_at",{ascending:false});
-      const{data:payData}=await supabase.from("payouts").select("*").eq("user_id",user.id).order("created_at",{ascending:false});
-      setRels(relData||[]);
-      setPays(payData||[]);
-      setLoading(false);
-    };
-    fetchData();
-  },[user.id]);
-  const totE=rels.reduce((s,r)=>s+(r.earnings||0),0);
-  const totS=rels.reduce((s,r)=>s+(r.streams||0),0);
-  const ml=mob?0:210;
-
-  const SideBtn=({id,ic,l})=>(
-    <button onClick={()=>setTab(id)}
-      style={{width:"100%",display:"flex",alignItems:"center",gap:12,
-        padding:"11px 20px",cursor:"pointer",fontFamily:"inherit",border:"none",
-        background:tab===id?`${G}08`:"transparent",
-        borderLeft:tab===id?`2px solid ${G}`:"2px solid transparent",
-        color:tab===id?"#fff":SB,fontSize:14,fontWeight:tab===id?600:400,
-        transition:"all .14s",textAlign:"left"}}>
-      <span style={{fontSize:17}}>{ic}</span>{l}
-    </button>
-  );
-  const MobBtn=({id,ic,l})=>(
-    <button onClick={()=>setTab(id)}
-      style={{flex:1,padding:"10px 6px",display:"flex",flexDirection:"column",alignItems:"center",
-        gap:3,cursor:"pointer",background:"none",border:"none",
-        color:tab===id?G:MT,transition:"color .14s"}}>
-      <span style={{fontSize:19}}>{ic}</span>
-      <span style={{fontSize:9.5,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",letterSpacing:".03em"}}>{l}</span>
-    </button>
-  );
-
-  return(
-    <div style={{minHeight:"100vh",background:BG}}>
-      {/* Topbar */}
-      <div style={{position:"fixed",top:0,left:0,right:0,height:60,
-        background:"rgba(4,6,12,.95)",backdropFilter:"blur(24px)",
-        borderBottom:`1px solid ${B1}`,zIndex:100,display:"flex",alignItems:"center",
-        justifyContent:"space-between",padding:"0 clamp(14px,3vw,28px)"}}>
-        <Logo sz={22}/>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:32,height:32,borderRadius:9,
-            background:`linear-gradient(135deg,${G}20,${BL}10)`,color:G,
-            fontWeight:800,fontSize:12,display:"flex",alignItems:"center",
-            justifyContent:"center",border:`1px solid ${G}16`,
-            fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{user.av}</div>
-          {!mob&&<div>
-            <div style={{fontSize:13.5,fontWeight:600,lineHeight:1}}>{user.name}</div>
-            <div style={{fontSize:10,color:OR,fontFamily:"'JetBrains Mono',monospace",marginTop:2}}>{user.plan} Plan</div>
-          </div>}
-          <Btn v="g" sz="sm" onClick={onLogout}>Logout</Btn>
-        </div>
-      </div>
-      {/* Sidebar */}
-      {!mob&&(
-        <div style={{position:"fixed",top:60,left:0,bottom:0,width:210,
-          background:S,borderRight:`1px solid ${B1}`,padding:"20px 0",overflowY:"auto"}}>
-          {[["overview","🏠","Overview"],["releases","🎵","Releases"],
-            ["earnings","📊","Earnings"],["payouts","💳","Payouts"]].map(([id,ic,l])=>(
-            <SideBtn key={id} id={id} ic={ic} l={l}/>
-          ))}
-          <div style={{position:"absolute",bottom:20,left:0,right:0,padding:"0 16px"}}>
-            <div style={{background:CARD,border:`1px solid ${B1}`,borderRadius:12,padding:"12px 14px"}}>
-              <div style={{fontSize:10,color:MT,fontFamily:"'JetBrains Mono',monospace",marginBottom:6,fontWeight:700}}>NEED HELP?</div>
-              <div style={{fontSize:12.5,color:SB,lineHeight:1.6,marginBottom:10}}>Contact our artist support team anytime.</div>
-              <Btn v="s" sz="sm" full>Get Support</Btn>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Content */}
-      <div style={{marginLeft:ml,padding:`76px clamp(14px,3vw,30px) ${mob?"88px":"40px"}`,minHeight:"100vh"}}>
-
-        {tab==="overview"&&(
-          <div>
-            <div className="fu" style={{marginBottom:26}}>
-              <div style={{fontSize:11,color:MT,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,letterSpacing:".06em",marginBottom:6}}>DASHBOARD</div>
-              <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(22px,3.5vw,34px)",fontWeight:900,letterSpacing:"-1.2px"}}>Welcome back, {user.name.split(" ")[0]} 👋</h1>
-            </div>
-            <div className="fu d1" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:24}}>
-              {[[fmt(totE),"Total Earnings",G,"💰"],[fK(totS),"Total Streams",BL,"🎵"],[`${rels.length}`,"Releases",OR,"📀"],["2,000+","Community",G,"🌍"]].map(([v,l,a,ic])=>(
-                <div key={l} style={{background:CARD,border:`1px solid ${B1}`,borderRadius:16,padding:18,position:"relative",overflow:"hidden"}}>
-                  <div style={{position:"absolute",top:0,right:0,width:70,height:70,borderRadius:"50%",background:`radial-gradient(${a}12,transparent 70%)`,pointerEvents:"none"}}/>
-                  <div style={{fontSize:10,fontWeight:700,color:MT,letterSpacing:".07em",textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    {l}<span style={{fontSize:16}}>{ic}</span>
-                  </div>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(18px,2.8vw,28px)",fontWeight:900,letterSpacing:"-1px"}}>{v}</div>
-                </div>
-              ))}
-            </div>
-            <div className="fu d2">
-              <div style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:800,marginBottom:14}}>Recent Releases</div>
-              {rels.slice(0,3).map(r=>(
-                <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"14px 18px",display:"flex",alignItems:"center",gap:14,marginBottom:10}}>
-                  <div style={{width:44,height:44,borderRadius:12,background:`linear-gradient(135deg,${G}18,${BL}10)`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🎵</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14.5,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>{r.title}</div>
-                    <div style={{fontSize:12,color:SB}}>{r.type} · {r.genre}</div>
-                  </div>
-                  <Badge s={r.status}/>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab==="releases"&&(
-          <div>
-            <div className="fu" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22,flexWrap:"wrap",gap:12}}>
-              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>My Releases</h2>
-              <Btn sz="sm">+ Upload New</Btn>
-            </div>
-            <div className="fu d1" style={{display:"flex",flexDirection:"column",gap:12}}>
-              {rels.map(r=>(
-                <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:16,padding:"18px 20px"}}>
-                  <div style={{display:"flex",alignItems:"flex-start",gap:15,flexWrap:"wrap"}}>
-                    <div style={{width:52,height:52,borderRadius:13,background:`linear-gradient(135deg,${G}18,${BL}10)`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🎵</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:5}}>
-                        <div style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:800}}>{r.title}</div>
-                        <Badge s={r.status}/>
-                      </div>
-                      <div style={{fontSize:12.5,color:SB,marginBottom:12}}>{r.type} · {r.genre}</div>
-                      <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:r.dists.length>0?12:0}}>
-                        <div style={{fontSize:12.5}}><span style={{color:MT,fontFamily:"'JetBrains Mono',monospace"}}>Earnings: </span><span style={{color:G,fontWeight:700}}>{fmt(r.earnings)}</span></div>
-                        <div style={{fontSize:12.5}}><span style={{color:MT,fontFamily:"'JetBrains Mono',monospace"}}>Streams: </span><span style={{fontWeight:600}}>{fK(r.streams)}</span></div>
-                      </div>
-                      {r.dists.length>0&&(
-                        <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-                          {r.dists.map(name=>{
-                            const Icon=DSP[name];
-                            return(
-                              <span key={name} style={{display:"inline-flex",alignItems:"center",gap:5,
-                                background:"rgba(255,255,255,0.04)",border:`1px solid ${B1}`,
-                                borderRadius:7,padding:"4px 9px",fontSize:11.5,color:SB}}>
-                                {Icon&&<Icon size={14}/>}{name}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab==="earnings"&&(
-          <div>
-            <div className="fu" style={{marginBottom:22}}>
-              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>Earnings</h2>
-            </div>
-            <div className="fu d1" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:24}}>
-              {[[fmt(totE),"Total Lifetime",G],[fmt(1970000),"This Month",BL],[fmt(7650000),"Best Release",OR]].map(([v,l,a])=>(
-                <div key={l} style={{background:CARD,border:`1px solid ${B1}`,borderRadius:16,padding:18,borderTop:`2px solid ${a}`}}>
-                  <div style={{fontSize:10,fontWeight:700,color:MT,letterSpacing:".07em",textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace",marginBottom:10}}>{l}</div>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(16px,2.5vw,26px)",fontWeight:900,color:a}}>{v}</div>
-                </div>
-              ))}
-            </div>
-            <div className="fu d2" style={{display:"flex",flexDirection:"column",gap:10}}>
-              {rels.filter(r=>r.earnings>0).map(r=>(
-                <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"14px 18px",display:"flex",alignItems:"center",gap:14}}>
-                  <div style={{width:38,height:38,borderRadius:10,background:`${G}10`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>🎵</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14.5,fontWeight:600}}>{r.title}</div>
-                    <div style={{fontSize:12,color:SB,marginTop:2}}>{fK(r.streams)} streams · {r.type}</div>
-                  </div>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:900,color:G,flexShrink:0}}>{fmt(r.earnings)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab==="payouts"&&(
-          <div>
-            <div className="fu" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22,flexWrap:"wrap",gap:12}}>
-              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>Payouts</h2>
-              <Btn v="b" sz="sm">Request Payout</Btn>
-            </div>
-            <div className="fu d1" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:22}}>
-              {[[fmt(totE-5500000),"Available",G],[fmt(2500000),"Pending",OR],[fmt(3000000),"Paid Out",BL]].map(([v,l,a])=>(
-                <div key={l} style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:16,borderTop:`2px solid ${a}`}}>
-                  <div style={{fontSize:10,fontWeight:700,color:MT,letterSpacing:".07em",textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace",marginBottom:8}}>{l}</div>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(15px,2.2vw,24px)",fontWeight:900,color:a}}>{v}</div>
-                </div>
-              ))}
-            </div>
-            <div className="fu d2" style={{display:"flex",flexDirection:"column",gap:10}}>
-              {pays.map(p=>(
-                <div key={p.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"14px 18px",display:"flex",alignItems:"center",gap:14}}>
-                  <div style={{width:38,height:38,borderRadius:10,background:p.status==="paid"?`${G}10`:`${OR}10`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{p.status==="paid"?"✓":"⏳"}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14.5,fontWeight:700}}>{fmt(p.amount)}</div>
-                    <div style={{fontSize:12,color:SB,marginTop:2}}>{p.method} · {p.at}</div>
-                  </div>
-                  <span style={{fontSize:11,fontWeight:700,color:p.status==="paid"?G:OR,background:p.status==="paid"?`${G}10`:`${OR}10`,border:`1px solid ${p.status==="paid"?G:OR}22`,borderRadius:999,padding:"4px 11px",fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{p.status==="paid"?"Paid":"Pending"}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-      {mob&&(
-        <div style={{position:"fixed",bottom:0,left:0,right:0,background:"rgba(4,6,12,.97)",
-          borderTop:`1px solid ${B1}`,display:"flex",zIndex:100}}>
-          {[["overview","🏠","Home"],["releases","🎵","Releases"],["earnings","📊","Earnings"],["payouts","💳","Payouts"]].map(([id,ic,l])=>(
-            <MobBtn key={id} id={id} ic={ic} l={l}/>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ── ADMIN DASHBOARD ──────────────────────────────────────────────────────────
-const AdminDash=({user,onLogout})=>{
-  const[tab,setTab]=useState("overview");
-  const[mob,setMob]=useState(window.innerWidth<768);
-  const[adminUsers,setAdminUsers]=useState([]);
-  const[adminRels,setAdminRels]=useState([]);
-  const[adminPays,setAdminPays]=useState([]);
-  const[loading,setLoading]=useState(true);
-  useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  useEffect(()=>{
-    const fetchAll=async()=>{
-      setLoading(true);
-      const{data:u}=await supabase.from("profiles").select("*").order("created_at",{ascending:false});
-      const{data:r}=await supabase.from("releases").select("*").order("created_at",{ascending:false});
-      const{data:p}=await supabase.from("payouts").select("*").order("created_at",{ascending:false});
-      setAdminUsers(u||[]);
-      setAdminRels(r||[]);
-      setAdminPays(p||[]);
-      setLoading(false);
-    };
-    fetchAll();
-  },[]);
-  const ml=mob?0:210;
-
-  return(
-    <div style={{minHeight:"100vh",background:BG}}>
-      <div style={{position:"fixed",top:0,left:0,right:0,height:60,
-        background:"rgba(4,6,12,.95)",backdropFilter:"blur(24px)",
-        borderBottom:`1px solid ${B1}`,zIndex:100,display:"flex",alignItems:"center",
-        justifyContent:"space-between",padding:"0 clamp(14px,3vw,28px)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <Logo sz={22}/>
-          <span style={{background:`${OR}10`,color:OR,border:`1px solid ${OR}22`,
-            borderRadius:7,padding:"3px 9px",fontSize:10,fontWeight:700,
-            fontFamily:"'JetBrains Mono',monospace",letterSpacing:".04em"}}>ADMIN</span>
-        </div>
-        <Btn v="g" sz="sm" onClick={onLogout}>Logout</Btn>
-      </div>
-      {!mob&&(
-        <div style={{position:"fixed",top:60,left:0,bottom:0,width:210,
-          background:S,borderRight:`1px solid ${B1}`,padding:"20px 0"}}>
-          {[["overview","🏠","Overview"],["releases","🎵","All Releases"],
-            ["artists","👥","Artists"],["payouts","💳","Payouts"]].map(([id,ic,l])=>(
-            <button key={id} onClick={()=>setTab(id)}
-              style={{width:"100%",display:"flex",alignItems:"center",gap:12,
-                padding:"11px 20px",cursor:"pointer",fontFamily:"inherit",border:"none",
-                background:tab===id?`${OR}08`:"transparent",
-                borderLeft:tab===id?`2px solid ${OR}`:"2px solid transparent",
-                color:tab===id?"#fff":SB,fontSize:14,fontWeight:tab===id?600:400,
-                transition:"all .14s",textAlign:"left"}}>
-              <span style={{fontSize:17}}>{ic}</span>{l}
+            <button style={{ ...css.btnG, opacity: busy?0.7:1 }} disabled={busy}
+              onClick={mode==="signin"?handleSignIn:handleSignUp}>
+              {busy ? "Please wait..." : mode==="signin" ? "Sign In" : "Create Account"}
             </button>
-          ))}
+          </div>
+
+          <p style={{ textAlign:"center", marginTop:20, fontSize:14, color:MUTED }}>
+            {mode==="signin" ? "Don't have an account? " : "Already have an account? "}
+            <span style={{ color:G, cursor:"pointer", fontWeight:600 }}
+              onClick={()=>{setMode(mode==="signin"?"signup":"signin");setErr("");setMsg("");}}>
+              {mode==="signin" ? "Sign Up Free" : "Sign In"}
+            </span>
+          </p>
         </div>
-      )}
-      <div style={{marginLeft:ml,padding:`76px clamp(14px,3vw,30px) ${mob?"88px":"40px"}`,minHeight:"100vh"}}>
-
-        {tab==="overview"&&(
-          <div>
-            <div className="fu" style={{marginBottom:26}}>
-              <div style={{fontSize:11,color:MT,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,letterSpacing:".06em",marginBottom:6}}>ADMIN PANEL</div>
-              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,30px)",fontWeight:900,letterSpacing:"-.8px"}}>Platform Overview</h2>
-            </div>
-            <div className="fu d1" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:24}}>
-              {[["2,000+","Total Artists",G],["127","Releases This Month",BL],["14","Pending Review",OR],[fmt(12800000),"Total Payouts",G]].map(([v,l,a])=>(
-                <div key={l} style={{background:CARD,border:`1px solid ${B1}`,borderRadius:16,padding:18,borderTop:`2px solid ${a}`}}>
-                  <div style={{fontSize:10,fontWeight:700,color:MT,letterSpacing:".07em",textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace",marginBottom:10}}>{l}</div>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(18px,2.5vw,28px)",fontWeight:900,color:a}}>{v}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:800,marginBottom:14}}>Pending Review</div>
-            {(adminRels||[]).filter(r=>r.status==="pending_review").map(r=>(
-              <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"14px 18px",display:"flex",alignItems:"center",gap:14,marginBottom:10,flexWrap:"wrap"}}>
-                <div style={{width:44,height:44,borderRadius:12,background:`linear-gradient(135deg,${G}18,${BL}10)`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🎵</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:14.5,fontWeight:600}}>{r.title}</div>
-                  <div style={{fontSize:12,color:SB,marginTop:2}}>{r.type} · {r.genre}</div>
-                </div>
-                <div style={{display:"flex",gap:8}}>
-                  <Btn sz="sm" v="s">✓ Approve</Btn>
-                  <Btn sz="sm" v="r">✗ Reject</Btn>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {tab==="releases"&&(
-          <div>
-            <div className="fu" style={{marginBottom:22}}>
-              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>All Releases</h2>
-            </div>
-            <div className="fu d1" style={{display:"flex",flexDirection:"column",gap:10}}>
-              {(adminRels||[]).map(r=>(
-                <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"15px 18px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:5,flexWrap:"wrap"}}>
-                      <div style={{fontSize:15,fontWeight:700}}>{r.title}</div><Badge s={r.status}/>
-                    </div>
-                    <div style={{fontSize:12.5,color:SB}}>{r.type} · {r.genre} · {fmt(r.earnings)} earned · {fK(r.streams)} streams</div>
-                  </div>
-                  {r.status==="pending_review"&&(
-                    <div style={{display:"flex",gap:8,flexShrink:0}}>
-                      <Btn sz="sm" v="s">Approve</Btn>
-                      <Btn sz="sm" v="r">Reject</Btn>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab==="artists"&&(
-          <div>
-            <div className="fu" style={{marginBottom:22}}>
-              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>Artists</h2>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12}}>
-              {(adminUsers||[]).filter(u=>u.role==="artist").map(u=>{
-                const uR=(adminRels||[]).filter(r=>r.user_id===u.id);
-                return(
-                  <div key={u.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:18,padding:20}}>
-                    <div style={{display:"flex",alignItems:"center",gap:13,marginBottom:16}}>
-                      <div style={{width:46,height:46,borderRadius:13,
-                        background:`linear-gradient(135deg,${G}20,${BL}10)`,color:G,fontWeight:800,
-                        fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",
-                        border:`1px solid ${G}16`,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{u.av}</div>
-                      <div>
-                        <div style={{fontWeight:700,fontSize:15}}>{u.name}</div>
-                        <div style={{fontSize:10.5,color:OR,fontFamily:"'JetBrains Mono',monospace",marginTop:3}}>{u.plan} Plan</div>
-                      </div>
-                    </div>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:9}}>
-                      {[[uR.length,"Releases"],[fmt(uR.reduce((s,r)=>s+r.earnings,0)),"Earnings"]].map(([v,l])=>(
-                        <div key={l} style={{background:C2,borderRadius:10,padding:"10px 13px"}}>
-                          <div style={{fontSize:10,color:MT,fontFamily:"'JetBrains Mono',monospace",marginBottom:4,fontWeight:700}}>{l}</div>
-                          <div style={{fontSize:14.5,fontWeight:700}}>{v}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {tab==="payouts"&&(
-          <div>
-            <div className="fu" style={{marginBottom:22}}>
-              <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>Payout Requests</h2>
-            </div>
-            <div className="fu d1" style={{display:"flex",flexDirection:"column",gap:10}}>
-              {(adminPays||[]).map(p=>(
-                <div key={p.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"14px 18px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:15,fontWeight:700,marginBottom:3}}>{fmt(p.amount)}</div>
-                    <div style={{fontSize:12,color:SB}}>{p.method} · {p.at}</div>
-                  </div>
-                  <span style={{fontSize:11,fontWeight:700,color:p.status==="paid"?G:OR,
-                    background:p.status==="paid"?`${G}10`:`${OR}10`,
-                    border:`1px solid ${p.status==="paid"?G:OR}22`,
-                    borderRadius:999,padding:"4px 12px",fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>
-                    {p.status==="paid"?"Paid":"Pending"}
-                  </span>
-                  {p.status==="pending"&&(
-                    <div style={{display:"flex",gap:8,flexShrink:0}}>
-                      <Btn sz="sm" v="s">Approve</Btn>
-                      <Btn sz="sm" v="r">Decline</Btn>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <p style={{ textAlign:"center", color:MUTED, fontSize:12, marginTop:16 }}>
+          Distribute to 100+ platforms · Keep 100% royalties · Free forever
+        </p>
       </div>
-      {mob&&(
-        <div style={{position:"fixed",bottom:0,left:0,right:0,background:"rgba(4,6,12,.97)",
-          borderTop:`1px solid ${B1}`,display:"flex",zIndex:100}}>
-          {[["overview","🏠","Home"],["releases","🎵","Releases"],["artists","👥","Artists"],["payouts","💳","Payouts"]].map(([id,ic,l])=>(
-            <button key={id} onClick={()=>setTab(id)}
-              style={{flex:1,padding:"10px 6px",display:"flex",flexDirection:"column",
-                alignItems:"center",gap:3,cursor:"pointer",background:"none",border:"none",
-                color:tab===id?OR:MT,transition:"color .14s"}}>
-              <span style={{fontSize:19}}>{ic}</span>
-              <span style={{fontSize:9.5,fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{l}</span>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
 
+// ── ARTIST DASHBOARD ──────────────────────────────────────────────────────────
+const ArtistDash = ({ user, onLogout }) => {
+  const [tab, setTab]         = useState("overview");
+  const [releases, setReleases] = useState([]);
+  const [payouts, setPayouts]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [mob, setMob]           = useState(window.innerWidth < 768);
 
-export default function App(){
-  const[page,setPage]=useState("home");
-  const[user,setUser]=useState(null);
-  const[loading,setLoading]=useState(true);
+  // Upload form
+  const [showUpload, setShowUpload]   = useState(false);
+  const [uTitle, setUTitle]           = useState("");
+  const [uType, setUType]             = useState("Single");
+  const [uGenre, setUGenre]           = useState("");
+  const [uFile, setUFile]             = useState(null);
+  const [uCover, setUCover]           = useState(null);
+  const [uBusy, setUBusy]             = useState(false);
+  const [uErr, setUErr]               = useState("");
+  const [uMsg, setUMsg]               = useState("");
 
-  useEffect(()=>{
-    // Check existing Supabase session on load
-    supabase.auth.getSession().then(async({data:{session}})=>{
-      if(session){
-        const{data:profile}=await supabase.from("profiles").select("*").eq("id",session.user.id).single();
-        if(profile){
-          setUser({
-            id:session.user.id,
-            email:session.user.email,
-            name:profile.name||session.user.email.split("@")[0],
-            role:profile.role||"artist",
-            plan:profile.plan||"Free",
-            av:profile.avatar_initials||(profile.name||"U").slice(0,2).toUpperCase(),
-          });
-          setPage("dashboard");
-        }
-      }
-      setLoading(false);
-    });
-    // Listen for auth changes
-    const{data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
-      if(!session){setUser(null);setPage("home");}
-    });
-    return()=>subscription.unsubscribe();
-  },[]);
+  // Payout form
+  const [showPayout, setShowPayout]   = useState(false);
+  const [pAmount, setPAmount]         = useState("");
+  const [pMethod, setPMethod]         = useState("bank");
+  const [pBank, setPBank]             = useState("");
+  const [pAcct, setPAcct]             = useState("");
+  const [pPhone, setPPhone]           = useState("");
+  const [pBusy, setPBusy]             = useState(false);
+  const [pMsg, setPMsg]               = useState("");
 
-  const go=p=>{setPage(p);window.scrollTo(0,0);};
-  const onLogin=u=>{setUser(u);setPage("dashboard");};
-  const onLogout=async()=>{
-    await supabase.auth.signOut();
-    setUser(null);
-    go("home");
+  // Promo form
+  const [showPromo, setShowPromo]     = useState(false);
+  const [promoMsg, setPromoMsg]       = useState("");
+  const [promoBusy, setPromoBusy]     = useState(false);
+  const [promoSent, setPromoSent]     = useState(false);
+
+  useEffect(() => {
+    const h = () => setMob(window.innerWidth < 768);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+
+  useEffect(() => { fetchData(); }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    const [{ data: r }, { data: p }] = await Promise.all([
+      supabase.from("releases").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("payouts").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+    ]);
+    setReleases(r || []);
+    setPayouts(p || []);
+    setLoading(false);
   };
 
-  const isPub=["home","careers","contact"].includes(page);
+  const totalEarnings = releases.reduce((s, r) => s + (r.earnings || 0), 0);
+  const totalStreams   = releases.reduce((s, r) => s + (r.streams  || 0), 0);
+  const canUpload      = user.plan === "Pro" || releases.length < FREE_RELEASE_LIMIT;
 
-  if(loading)return(
-    <div style={{minHeight:"100vh",background:BG,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}>
-        <div className="spinning" style={{width:32,height:32,border:`2px solid ${B1}`,borderTopColor:G,borderRadius:"50%",margin:"0 auto 16px"}}/>
-        <div style={{fontSize:13,color:MT,fontFamily:"'JetBrains Mono',monospace"}}>Loading…</div>
+  const handleUpload = async () => {
+    setUErr(""); setUMsg("");
+    if (!uTitle || !uGenre) { setUErr("Please fill in title and genre."); return; }
+    if (!canUpload) { setUErr(`Free plan allows ${FREE_RELEASE_LIMIT} releases. Upgrade to Pro for unlimited.`); return; }
+    setUBusy(true);
+    let audio_url = null, cover_url = null;
+
+    if (uFile) {
+      try {
+        const ext  = uFile.name.split(".").pop();
+        const path = `${user.id}/${Date.now()}_audio.${ext}`;
+        const { error: upErr } = await supabase.storage.from("music").upload(path, uFile);
+        if (upErr) {
+          // If storage fails, still allow metadata submission
+          console.warn("Audio upload warning:", upErr.message);
+        } else {
+          const { data: urlData } = supabase.storage.from("music").getPublicUrl(path);
+          audio_url = urlData.publicUrl;
+        }
+      } catch(e) { console.warn("Audio upload skipped:", e.message); }
+    }
+
+    if (uCover) {
+      try {
+        const ext  = uCover.name.split(".").pop();
+        const path = `${user.id}/${Date.now()}_cover.${ext}`;
+        const { error: cvErr } = await supabase.storage.from("covers").upload(path, uCover);
+        if (!cvErr) {
+          const { data: cvUrl } = supabase.storage.from("covers").getPublicUrl(path);
+          cover_url = cvUrl.publicUrl;
+        }
+      } catch(e) { console.warn("Cover upload skipped:", e.message); }
+    }
+
+    const { error } = await supabase.from("releases").insert({
+      user_id: user.id, title: uTitle, type: uType, genre: uGenre,
+      status: "pending_review", earnings: 0, streams: 0,
+      audio_url, cover_url, dsps: [],
+      created_at: new Date().toISOString(),
+    });
+
+    if (error) { setUErr("Failed to submit: " + error.message); setUBusy(false); return; }
+    setUMsg("✅ Release submitted for review!");
+    setUTitle(""); setUGenre(""); setUFile(null); setUCover(null); setUType("Single");
+    fetchData();
+    setUBusy(false);
+    setTimeout(() => { setShowUpload(false); setUMsg(""); }, 2000);
+  };
+
+  const handlePayout = async () => {
+    setPMsg("");
+    if (!pAmount || isNaN(pAmount) || Number(pAmount) < 5000) { setPMsg("❌ Minimum payout is ₦5,000"); return; }
+    if (pMethod === "bank" && (!pBank || !pAcct)) { setPMsg("❌ Enter bank name and account number"); return; }
+    if (pMethod === "mobile" && !pPhone) { setPMsg("❌ Enter your mobile money number"); return; }
+    setPBusy(true);
+    const { error } = await supabase.from("payouts").insert({
+      user_id: user.id, amount: Number(pAmount),
+      status: "pending", method: pMethod,
+      bank_name: pBank, account_number: pAcct, phone: pPhone,
+      created_at: new Date().toISOString(),
+    });
+    if (error) { setPMsg("❌ " + error.message); setPBusy(false); return; }
+    setPMsg("✅ Payout request submitted!");
+    setPAmount(""); setPBank(""); setPAcct(""); setPPhone("");
+    fetchData();
+    setPBusy(false);
+    setTimeout(() => { setShowPayout(false); setPMsg(""); }, 2000);
+  };
+
+  const handlePromo = async () => {
+    if (!promoMsg) return;
+    setPromoBusy(true);
+    await supabase.from("promo_requests").insert({
+      user_id: user.id, artist_name: user.name,
+      message: promoMsg, status: "pending",
+      created_at: new Date().toISOString(),
+    });
+    setPromoSent(true);
+    setPromoBusy(false);
+  };
+
+  const NavBtn = ({ id, icon, label }) => (
+    <button onClick={() => setTab(id)} style={{
+      display:"flex", alignItems:"center", gap:10,
+      padding:"11px 20px", width:"100%",
+      background: tab===id ? `${G}12` : "transparent",
+      borderLeft: tab===id ? `3px solid ${G}` : "3px solid transparent",
+      color: tab===id ? WHITE : MUTED,
+      border:"none", borderLeft: tab===id ? `3px solid ${G}` : "3px solid transparent",
+      cursor:"pointer", fontSize:14, fontWeight: tab===id ? 600 : 400,
+      textAlign:"left",
+    }}>
+      <span style={{ fontSize:18 }}>{icon}</span>{label}
+    </button>
+  );
+
+  const StatCard = ({ label, value, sub }) => (
+    <div style={{ ...css.card, flex:1, minWidth:140 }}>
+      <div style={{ color:MUTED, fontSize:12, fontWeight:600, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</div>
+      <div style={{ fontSize:28, fontWeight:800, color:G }}>{value}</div>
+      {sub && <div style={{ color:MUTED, fontSize:12, marginTop:4 }}>{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div style={css.page}>
+      {/* TOPBAR */}
+      <div style={css.topbar}>
+        <Logo size={22}/>
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <div style={{ ...css.tag, background: user.plan==="Pro" ? `${OR}18` : `${G}12`,
+            color: user.plan==="Pro" ? OR : G,
+            border:`1px solid ${user.plan==="Pro" ? OR : G}30` }}>
+            {user.plan}
+          </div>
+          <div style={{ width:36, height:36, borderRadius:"50%", background:`${G}20`,
+            border:`1px solid ${G}40`, display:"flex", alignItems:"center",
+            justifyContent:"center", fontWeight:700, fontSize:14, color:G }}>
+            {user.av}
+          </div>
+          <button onClick={onLogout} style={{ ...css.btnGhost, padding:"8px 16px", fontSize:13 }}>Logout</button>
+        </div>
+      </div>
+
+      {/* SIDEBAR — desktop */}
+      {!mob && (
+        <div style={css.sidebar}>
+          <div style={{ padding:"0 16px 16px", color:MUTED, fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase" }}>Menu</div>
+          <NavBtn id="overview"  icon="🏠" label="Overview"/>
+          <NavBtn id="releases"  icon="🎵" label="My Releases"/>
+          <NavBtn id="earnings"  icon="₦"  label="Earnings"/>
+          <NavBtn id="payouts"   icon="💳" label="Payouts"/>
+          <NavBtn id="promo"     icon="📣" label="Promotion"/>
+          <NavBtn id="profile"   icon="⚙️" label="Profile"/>
+          {user.plan === "Free" && (
+            <div style={{ margin:"auto 16px 16px", padding:16,
+              background:`${OR}10`, border:`1px solid ${OR}25`, borderRadius:12 }}>
+              <div style={{ fontWeight:700, fontSize:13, marginBottom:6 }}>Upgrade to Pro</div>
+              <div style={{ color:MUTED, fontSize:12, marginBottom:12 }}>₦25,000/month · Unlimited releases · Priority distribution</div>
+              <button style={{ ...css.btnG, background:OR, fontSize:13, padding:"10px 0" }}
+                onClick={() => setTab("upgrade")}>Upgrade Now</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MAIN CONTENT */}
+      <div style={mob ? css.mainMob : css.main}>
+        <div style={{ maxWidth:900 }}>
+
+          {/* OVERVIEW */}
+          {tab === "overview" && (
+            <div>
+              <h2 style={{ marginBottom:4 }}>Welcome back, {user.name.split(" ")[0]} 👋</h2>
+              <p style={{ color:MUTED, marginBottom:24 }}>Here's how your music is performing.</p>
+              {loading ? <div style={{ color:MUTED }}>Loading...</div> : (
+                <>
+                  <div style={{ display:"flex", gap:16, flexWrap:"wrap", marginBottom:24 }}>
+                    <StatCard label="Total Earnings"  value={fmt(totalEarnings)}       sub="All time"/>
+                    <StatCard label="Total Streams"   value={fmtK(totalStreams)}        sub="Across all platforms"/>
+                    <StatCard label="Releases"        value={releases.length}           sub={user.plan==="Free" ? `${FREE_RELEASE_LIMIT - releases.length} remaining on Free` : "Unlimited"}/>
+                    <StatCard label="Plan"            value={user.plan}                 sub={user.plan==="Free" ? "Upgrade for unlimited" : "Pro member"}/>
+                  </div>
+                  <div style={{ ...css.card, marginBottom:24 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+                      <h3 style={{ margin:0 }}>Recent Releases</h3>
+                      <button style={{ ...css.btnG, width:"auto", padding:"9px 20px", fontSize:13 }}
+                        onClick={() => setShowUpload(true)}>+ New Release</button>
+                    </div>
+                    {releases.length === 0
+                      ? <div style={{ textAlign:"center", padding:"40px 0", color:MUTED }}>
+                          <div style={{ fontSize:40, marginBottom:12 }}>🎵</div>
+                          <div style={{ fontWeight:600, marginBottom:8 }}>No releases yet</div>
+                          <div style={{ fontSize:14 }}>Upload your first track and start distributing worldwide</div>
+                        </div>
+                      : releases.slice(0,5).map(r => (
+                          <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                            padding:"12px 0", borderBottom:`1px solid ${BORDER}` }}>
+                            <div>
+                              <div style={{ fontWeight:600 }}>{r.title}</div>
+                              <div style={{ color:MUTED, fontSize:13 }}>{r.type} · {r.genre}</div>
+                            </div>
+                            <div style={{ textAlign:"right" }}>
+                              <div style={{ ...css.tag, background:`${(STATUS_MAP[r.status]||{color:MUTED}).color}18`,
+                                color:(STATUS_MAP[r.status]||{color:MUTED}).color,
+                                border:`1px solid ${(STATUS_MAP[r.status]||{color:MUTED}).color}30`, marginBottom:4 }}>
+                                {(STATUS_MAP[r.status]||{label:r.status}).label}
+                              </div>
+                              <div style={{ color:G, fontSize:13 }}>{fmt(r.earnings)}</div>
+                            </div>
+                          </div>
+                        ))
+                    }
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* RELEASES */}
+          {tab === "releases" && (
+            <div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+                <h2 style={{ margin:0 }}>My Releases</h2>
+                <button style={{ ...css.btnG, width:"auto", padding:"10px 22px" }}
+                  onClick={() => setShowUpload(true)}>+ Upload Release</button>
+              </div>
+              {user.plan === "Free" && (
+                <div style={{ ...css.card, background:`${OR}08`, border:`1px solid ${OR}25`, marginBottom:16 }}>
+                  <span style={{ color:OR, fontWeight:600 }}>Free Plan: </span>
+                  <span style={{ color:MUTED, fontSize:14 }}>{releases.length}/{FREE_RELEASE_LIMIT} releases used · </span>
+                  <span style={{ color:OR, cursor:"pointer", fontWeight:600 }} onClick={()=>setTab("upgrade")}>Upgrade to Pro for unlimited →</span>
+                </div>
+              )}
+              {loading ? <div style={{ color:MUTED }}>Loading...</div>
+                : releases.length === 0
+                  ? <div style={{ ...css.card, textAlign:"center", padding:"60px 0" }}>
+                      <div style={{ fontSize:48, marginBottom:16 }}>🎵</div>
+                      <div style={{ fontWeight:700, fontSize:18, marginBottom:8 }}>No releases yet</div>
+                      <div style={{ color:MUTED, marginBottom:24 }}>Upload your first track and go live worldwide in 2–3 days</div>
+                      <button style={{ ...css.btnG, width:"auto", padding:"12px 32px", margin:"0 auto", display:"block" }}
+                        onClick={() => setShowUpload(true)}>Upload Now</button>
+                    </div>
+                  : releases.map(r => (
+                      <div key={r.id} style={{ ...css.card, marginBottom:12 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:12 }}>
+                          <div>
+                            <div style={{ fontWeight:700, fontSize:17, marginBottom:4 }}>{r.title}</div>
+                            <div style={{ color:MUTED, fontSize:14 }}>{r.type} · {r.genre} · {new Date(r.created_at).toLocaleDateString()}</div>
+                            {r.dsps?.length > 0 && (
+                              <div style={{ marginTop:8, display:"flex", gap:6, flexWrap:"wrap" }}>
+                                {r.dsps.map(d => (
+                                  <span key={d} style={{ ...css.tag, background:`${BL}12`, color:BL, border:`1px solid ${BL}25`, fontSize:11 }}>{d}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <div style={{ ...css.tag, background:`${(STATUS_MAP[r.status]||{color:MUTED}).color}15`,
+                              color:(STATUS_MAP[r.status]||{color:MUTED}).color,
+                              border:`1px solid ${(STATUS_MAP[r.status]||{color:MUTED}).color}30`, marginBottom:8 }}>
+                              {(STATUS_MAP[r.status]||{label:r.status}).label}
+                            </div>
+                            <div style={{ fontWeight:700, color:G }}>{fmt(r.earnings)}</div>
+                            <div style={{ color:MUTED, fontSize:12 }}>{fmtK(r.streams)} streams</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+              }
+            </div>
+          )}
+
+          {/* EARNINGS */}
+          {tab === "earnings" && (
+            <div>
+              <h2 style={{ marginBottom:24 }}>Earnings</h2>
+              <div style={{ display:"flex", gap:16, flexWrap:"wrap", marginBottom:24 }}>
+                <StatCard label="Total Earned"    value={fmt(totalEarnings)} sub="All time"/>
+                <StatCard label="Total Streams"   value={fmtK(totalStreams)} sub="Across all platforms"/>
+                <StatCard label="Paid Out"        value={fmt(payouts.filter(p=>p.status==="paid").reduce((s,p)=>s+p.amount,0))} sub="Successfully paid"/>
+                <StatCard label="Pending Payout"  value={fmt(payouts.filter(p=>p.status==="pending").reduce((s,p)=>s+p.amount,0))} sub="Being processed"/>
+              </div>
+              <div style={css.card}>
+                <h3 style={{ margin:"0 0 16px" }}>Earnings by Release</h3>
+                {releases.length === 0
+                  ? <div style={{ color:MUTED, textAlign:"center", padding:"32px 0" }}>No releases yet</div>
+                  : releases.map(r => (
+                      <div key={r.id} style={{ display:"flex", justifyContent:"space-between",
+                        padding:"12px 0", borderBottom:`1px solid ${BORDER}` }}>
+                        <div>
+                          <div style={{ fontWeight:600 }}>{r.title}</div>
+                          <div style={{ color:MUTED, fontSize:13 }}>{fmtK(r.streams)} streams</div>
+                        </div>
+                        <div style={{ fontWeight:700, color:G }}>{fmt(r.earnings)}</div>
+                      </div>
+                    ))
+                }
+              </div>
+            </div>
+          )}
+
+          {/* PAYOUTS */}
+          {tab === "payouts" && (
+            <div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+                <h2 style={{ margin:0 }}>Payouts</h2>
+                <button style={{ ...css.btnG, width:"auto", padding:"10px 22px" }}
+                  onClick={() => setShowPayout(true)}>Request Payout</button>
+              </div>
+              <div style={{ display:"flex", gap:16, flexWrap:"wrap", marginBottom:16 }}>
+                <div style={{ ...css.card, flex:1, minWidth:180 }}>
+                  <div style={{ color:MUTED, fontSize:12, fontWeight:600, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Available Balance</div>
+                  <div style={{ fontSize:28, fontWeight:800, color:G }}>{fmt(totalEarnings - payouts.filter(p=>p.status!=="rejected").reduce((s,p)=>s+p.amount,0))}</div>
+                </div>
+                <div style={{ ...css.card, flex:1, minWidth:180 }}>
+                  <div style={{ color:MUTED, fontSize:12, fontWeight:600, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Total Earned</div>
+                  <div style={{ fontSize:28, fontWeight:800, color:WHITE }}>{fmt(totalEarnings)}</div>
+                </div>
+                <div style={{ ...css.card, flex:1, minWidth:180 }}>
+                  <div style={{ color:MUTED, fontSize:12, fontWeight:600, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Pending Payout</div>
+                  <div style={{ fontSize:28, fontWeight:800, color:OR }}>{fmt(payouts.filter(p=>p.status==="pending").reduce((s,p)=>s+p.amount,0))}</div>
+                </div>
+                <div style={{ ...css.card, flex:1, minWidth:180 }}>
+                  <div style={{ color:MUTED, fontSize:12, fontWeight:600, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Total Paid Out</div>
+                  <div style={{ fontSize:28, fontWeight:800, color:BL }}>{fmt(payouts.filter(p=>p.status==="paid").reduce((s,p)=>s+p.amount,0))}</div>
+                </div>
+              </div>
+              {loading ? <div style={{ color:MUTED }}>Loading...</div>
+                : payouts.length === 0
+                  ? <div style={{ ...css.card, textAlign:"center", padding:"40px 0", color:MUTED }}>No payout requests yet</div>
+                  : payouts.map(p => (
+                      <div key={p.id} style={{ ...css.card, marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <div>
+                          <div style={{ fontWeight:600 }}>{fmt(p.amount)}</div>
+                          <div style={{ color:MUTED, fontSize:13 }}>{p.method === "bank" ? `Bank Transfer · ${p.bank_name} · Acct: ${p.account_number}` : `Mobile Money · ${p.phone}`} · {new Date(p.created_at).toLocaleDateString()}</div>
+                        </div>
+                        <div style={{ ...css.tag,
+                          background: p.status==="paid" ? `${G}15` : `${OR}15`,
+                          color: p.status==="paid" ? G : OR,
+                          border:`1px solid ${p.status==="paid" ? G : OR}30` }}>
+                          {p.status === "paid" ? "Paid" : "Pending"}
+                        </div>
+                      </div>
+                    ))
+              }
+            </div>
+          )}
+
+          {/* PROMOTION */}
+          {tab === "promo" && (
+            <div>
+              <h2 style={{ marginBottom:8 }}>Request Promotion</h2>
+              <p style={{ color:MUTED, marginBottom:24 }}>
+                {user.plan === "Pro"
+                  ? "As a Pro member you get a free post on our socials for your first release each month."
+                  : "Upgrade to Pro to get free promotional materials and social media posts."}
+              </p>
+              {user.plan !== "Pro"
+                ? <div style={{ ...css.card, textAlign:"center", padding:"48px 24px" }}>
+                    <div style={{ fontSize:40, marginBottom:16 }}>📣</div>
+                    <div style={{ fontWeight:700, fontSize:18, marginBottom:8 }}>Pro Feature</div>
+                    <div style={{ color:MUTED, marginBottom:24 }}>Upgrade to Pro to request promotion, get an assigned agent and free promotional materials.</div>
+                    <button style={{ ...css.btnG, width:"auto", padding:"12px 32px", margin:"0 auto", display:"block", background:OR }}
+                      onClick={() => setTab("upgrade")}>Upgrade to Pro — ₦25,000/month</button>
+                  </div>
+                : promoSent
+                  ? <div style={{ ...css.card, textAlign:"center", padding:"48px 24px" }}>
+                      <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+                      <div style={{ fontWeight:700, fontSize:18, marginBottom:8 }}>Request Sent!</div>
+                      <div style={{ color:MUTED }}>Our team will reach out within 24 hours with your promotional materials.</div>
+                    </div>
+                  : <div style={css.card}>
+                      <label style={css.label}>Tell us about this release</label>
+                      <textarea value={promoMsg} onChange={e=>setPromoMsg(e.target.value)}
+                        placeholder="Which release? Any specific platforms or audience you want to target? Any other info..."
+                        style={{ ...css.input, minHeight:120, resize:"vertical" }}/>
+                      <button style={{ ...css.btnG, marginTop:16, opacity:promoBusy?0.7:1 }}
+                        disabled={promoBusy} onClick={handlePromo}>
+                        {promoBusy ? "Sending..." : "Submit Promotion Request"}
+                      </button>
+                    </div>
+              }
+            </div>
+          )}
+
+          {/* PROFILE */}
+          {tab === "profile" && (
+            <div>
+              <h2 style={{ marginBottom:24 }}>Profile</h2>
+              <div style={css.card}>
+                <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:24 }}>
+                  <div style={{ width:64, height:64, borderRadius:"50%",
+                    background:`${G}20`, border:`2px solid ${G}40`,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    fontWeight:800, fontSize:22, color:G }}>{user.av}</div>
+                  <div>
+                    <div style={{ fontWeight:700, fontSize:20 }}>{user.name}</div>
+                    <div style={{ color:MUTED }}>{user.email}</div>
+                  </div>
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+                  {[["Name", user.name], ["Email", user.email], ["Plan", user.plan], ["Role", user.role]].map(([k,v])=>(
+                    <div key={k}>
+                      <label style={css.label}>{k}</label>
+                      <div style={{ ...css.input, color:MUTED, cursor:"default" }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* UPGRADE */}
+          {tab === "upgrade" && (
+            <div>
+              <h2 style={{ marginBottom:8 }}>Upgrade to Pro</h2>
+              <p style={{ color:MUTED, marginBottom:24 }}>Unlock the full FamousTechPlay experience</p>
+              <div style={{ display:"flex", gap:16, flexWrap:"wrap" }}>
+                {/* Free card */}
+                <div style={{ ...css.card, flex:1, minWidth:260 }}>
+                  <div style={{ fontWeight:800, fontSize:20, marginBottom:4 }}>Free</div>
+                  <div style={{ fontSize:28, fontWeight:800, marginBottom:16 }}>₦0 <span style={{ fontSize:14, color:MUTED }}>/month</span></div>
+                  {["Up to 3 releases","All 100+ platforms","Keep 100% royalties","Standard distribution speed"].map(f=>(
+                    <div key={f} style={{ display:"flex", gap:8, marginBottom:10, color:MUTED, fontSize:14 }}>
+                      <span style={{ color:G }}>✓</span>{f}
+                    </div>
+                  ))}
+                  <div style={{ ...css.btnGhost, textAlign:"center", marginTop:16, opacity:0.5, cursor:"default" }}>Current Plan</div>
+                </div>
+                {/* Pro card */}
+                <div style={{ ...css.card, flex:1, minWidth:260, border:`1px solid ${OR}50`, position:"relative" }}>
+                  <div style={{ position:"absolute", top:-12, right:16, ...css.tag, background:OR, color:"#000", fontSize:11 }}>MOST POPULAR</div>
+                  <div style={{ fontWeight:800, fontSize:20, marginBottom:4, color:OR }}>Pro</div>
+                  <div style={{ fontSize:28, fontWeight:800, marginBottom:16 }}>₦25,000 <span style={{ fontSize:14, color:MUTED }}>/month</span></div>
+                  {[
+                    "Unlimited releases",
+                    "Priority distribution (faster live)",
+                    "Free promotion on our socials",
+                    "Free promotional materials",
+                    "Assigned promotion agent",
+                    "First release of the month promoted free",
+                    "Higher payout priority",
+                  ].map(f=>(
+                    <div key={f} style={{ display:"flex", gap:8, marginBottom:10, fontSize:14 }}>
+                      <span style={{ color:OR }}>✓</span>{f}
+                    </div>
+                  ))}
+                  <button style={{ ...css.btnG, background:OR, marginTop:16 }}
+                    onClick={() => window.open("https://paystack.com/pay/famoustechplay-pro","_blank")}>
+                    Upgrade Now — ₦25,000/month
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* MOB NAV */}
+      {mob && (
+        <div style={{ position:"fixed", bottom:0, left:0, right:0,
+          background:"rgba(4,6,12,0.97)", borderTop:`1px solid ${BORDER}`,
+          display:"flex", zIndex:100 }}>
+          {[["overview","🏠","Home"],["releases","🎵","Music"],["earnings","₦","Earn"],["payouts","💳","Pay"],["promo","📣","Promo"]].map(([id,ic,lb])=>(
+            <button key={id} onClick={()=>setTab(id)} style={{
+              flex:1, padding:"10px 4px", display:"flex", flexDirection:"column",
+              alignItems:"center", gap:3, cursor:"pointer", background:"none", border:"none",
+              color: tab===id ? G : MUTED, fontSize:10, fontWeight:700 }}>
+              <span style={{ fontSize:20 }}>{ic}</span>{lb}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* UPLOAD MODAL */}
+      {showUpload && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:200,
+          display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+          <div style={{ ...css.card, width:"100%", maxWidth:480, maxHeight:"90vh", overflowY:"auto" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+              <h3 style={{ margin:0 }}>Upload New Release</h3>
+              <button onClick={()=>setShowUpload(false)} style={{ background:"none", border:"none", color:MUTED, fontSize:22, cursor:"pointer" }}>✕</button>
+            </div>
+            {uErr && <div style={{ background:"rgba(255,23,68,0.1)", border:"1px solid rgba(255,23,68,0.3)", borderRadius:8, padding:"10px 14px", color:"#FF6B6B", fontSize:13, marginBottom:12 }}>{uErr}</div>}
+            {uMsg && <div style={{ background:"rgba(0,230,118,0.1)", border:"1px solid rgba(0,230,118,0.3)", borderRadius:8, padding:"10px 14px", color:G, fontSize:13, marginBottom:12 }}>{uMsg}</div>}
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+              <div>
+                <label style={css.label}>Title *</label>
+                <input style={css.input} placeholder="Song or album title" value={uTitle} onChange={e=>setUTitle(e.target.value)}/>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div>
+                  <label style={css.label}>Type</label>
+                  <select style={{ ...css.input }} value={uType} onChange={e=>setUType(e.target.value)}>
+                    {["Single","EP","Album","Mixtape"].map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={css.label}>Genre *</label>
+                  <input style={css.input} placeholder="e.g. Afrobeats" value={uGenre} onChange={e=>setUGenre(e.target.value)}/>
+                </div>
+              </div>
+              <div>
+                <label style={css.label}>Audio File (MP3/WAV)</label>
+                <input type="file" accept="audio/*" style={{ ...css.input, padding:"10px" }}
+                  onChange={e=>setUFile(e.target.files[0])}/>
+              </div>
+              <div>
+                <label style={css.label}>Cover Art (JPG/PNG)</label>
+                <input type="file" accept="image/*" style={{ ...css.input, padding:"10px" }}
+                  onChange={e=>setUCover(e.target.files[0])}/>
+              </div>
+              <button style={{ ...css.btnG, opacity:uBusy?0.7:1 }} disabled={uBusy} onClick={handleUpload}>
+                {uBusy ? "Uploading..." : "Submit for Distribution"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PAYOUT MODAL */}
+      {showPayout && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:200,
+          display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+          <div style={{ ...css.card, width:"100%", maxWidth:440 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+              <h3 style={{ margin:0 }}>Request Payout</h3>
+              <button onClick={()=>setShowPayout(false)} style={{ background:"none", border:"none", color:MUTED, fontSize:22, cursor:"pointer" }}>✕</button>
+            </div>
+            {pMsg && <div style={{ padding:"10px 14px", borderRadius:8, fontSize:13, marginBottom:12,
+              background: pMsg.startsWith("✅") ? "rgba(0,230,118,0.1)" : "rgba(255,23,68,0.1)",
+              color: pMsg.startsWith("✅") ? G : "#FF6B6B",
+              border: `1px solid ${pMsg.startsWith("✅") ? G : "#FF1744"}30` }}>{pMsg}</div>}
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+              <div>
+                <label style={css.label}>Amount (₦)</label>
+                <input style={css.input} type="number" placeholder="Min ₦5,000" value={pAmount} onChange={e=>setPAmount(e.target.value)}/>
+              </div>
+              <div>
+                <label style={css.label}>Payment Method</label>
+                <select style={css.input} value={pMethod} onChange={e=>setPMethod(e.target.value)}>
+                  <option value="bank">Bank Transfer</option>
+                  <option value="mobile">Mobile Money (Opay/Palmpay)</option>
+                </select>
+              </div>
+              {pMethod === "bank" ? <>
+                <div>
+                  <label style={css.label}>Bank Name</label>
+                  <input style={css.input} placeholder="e.g. GTBank" value={pBank} onChange={e=>setPBank(e.target.value)}/>
+                </div>
+                <div>
+                  <label style={css.label}>Account Number</label>
+                  <input style={css.input} placeholder="10-digit account number" value={pAcct} onChange={e=>setPAcct(e.target.value)}/>
+                </div>
+              </> : (
+                <div>
+                  <label style={css.label}>Mobile Number</label>
+                  <input style={css.input} placeholder="e.g. 08012345678" value={pPhone} onChange={e=>setPPhone(e.target.value)}/>
+                </div>
+              )}
+              <button style={{ ...css.btnG, opacity:pBusy?0.7:1 }} disabled={pBusy} onClick={handlePayout}>
+                {pBusy ? "Submitting..." : "Submit Payout Request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── ADMIN DASHBOARD ───────────────────────────────────────────────────────────
+const AdminDash = ({ user, onLogout }) => {
+  const [tab, setTab]       = useState("overview");
+  const [users, setUsers]   = useState([]);
+  const [releases, setReleases] = useState([]);
+  const [payouts, setPayouts]   = useState([]);
+  const [promos, setPromos]     = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [mob, setMob]           = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const h = () => setMob(window.innerWidth < 768);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+
+  useEffect(() => { fetchAll(); }, []);
+
+  const fetchAll = async () => {
+    setLoading(true);
+    const [{ data: u }, { data: r }, { data: p }, { data: pr }] = await Promise.all([
+      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+      supabase.from("releases").select("*").order("created_at", { ascending: false }),
+      supabase.from("payouts").select("*").order("created_at", { ascending: false }),
+      supabase.from("promo_requests").select("*").order("created_at", { ascending: false }),
+    ]);
+    setUsers(u || []);
+    setReleases(r || []);
+    setPayouts(p || []);
+    setPromos(pr || []);
+    setLoading(false);
+  };
+
+  const updateRelease = async (id, status) => {
+    await supabase.from("releases").update({ status }).eq("id", id);
+    fetchAll();
+  };
+
+  const updatePayout = async (id, status) => {
+    await supabase.from("payouts").update({ status }).eq("id", id);
+    fetchAll();
+  };
+
+  const NavBtn = ({ id, icon, label, badge }) => (
+    <button onClick={() => setTab(id)} style={{
+      display:"flex", alignItems:"center", justifyContent:"space-between",
+      padding:"11px 20px", width:"100%",
+      background: tab===id ? `${G}12` : "transparent",
+      borderLeft: tab===id ? `3px solid ${G}` : "3px solid transparent",
+      color: tab===id ? WHITE : MUTED,
+      border:"none", cursor:"pointer", fontSize:14,
+      fontWeight: tab===id ? 600 : 400, textAlign:"left",
+    }}>
+      <span style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <span style={{ fontSize:18 }}>{icon}</span>{label}
+      </span>
+      {badge > 0 && <span style={{ background:"#FF1744", color:WHITE, borderRadius:10,
+        padding:"2px 8px", fontSize:11, fontWeight:700 }}>{badge}</span>}
+    </button>
+  );
+
+  const StatCard = ({ label, value }) => (
+    <div style={{ ...css.card, flex:1, minWidth:140 }}>
+      <div style={{ color:MUTED, fontSize:12, fontWeight:600, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</div>
+      <div style={{ fontSize:28, fontWeight:800, color:G }}>{value}</div>
+    </div>
+  );
+
+  const pending = releases.filter(r => r.status === "pending_review");
+  const pendingPayouts = payouts.filter(p => p.status === "pending");
+
+  return (
+    <div style={css.page}>
+      <div style={css.topbar}>
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <Logo size={22}/>
+          <span style={{ ...css.tag, background:`${OR}18`, color:OR, border:`1px solid ${OR}30` }}>ADMIN</span>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <span style={{ color:MUTED, fontSize:14 }}>{user.name}</span>
+          <button onClick={onLogout} style={{ ...css.btnGhost, padding:"8px 16px", fontSize:13 }}>Logout</button>
+        </div>
+      </div>
+
+      {!mob && (
+        <div style={css.sidebar}>
+          <div style={{ padding:"0 16px 16px", color:MUTED, fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase" }}>Admin</div>
+          <NavBtn id="overview"  icon="📊" label="Overview"/>
+          <NavBtn id="pending"   icon="⏳" label="Pending Reviews" badge={pending.length}/>
+          <NavBtn id="releases"  icon="🎵" label="All Releases"/>
+          <NavBtn id="artists"   icon="👥" label="All Artists"/>
+          <NavBtn id="payouts"   icon="💳" label="Payouts" badge={pendingPayouts.length}/>
+          <NavBtn id="promos"    icon="📣" label="Promo Requests" badge={promos.filter(p=>p.status==="pending").length}/>
+        </div>
+      )}
+
+      <div style={mob ? css.mainMob : css.main}>
+        <div style={{ maxWidth:960 }}>
+
+          {tab === "overview" && (
+            <div>
+              <h2 style={{ marginBottom:24 }}>Admin Overview</h2>
+              {loading ? <div style={{ color:MUTED }}>Loading...</div> : (
+                <>
+                  <div style={{ display:"flex", gap:16, flexWrap:"wrap", marginBottom:24 }}>
+                    <StatCard label="Total Artists"        value={users.filter(u=>u.role==="artist").length}/>
+                    <StatCard label="Total Releases"       value={releases.length}/>
+                    <StatCard label="Pending Reviews"      value={pending.length}/>
+                    <StatCard label="Pending Payouts"      value={pendingPayouts.length}/>
+                    <StatCard label="Pro Members"          value={users.filter(u=>u.plan==="Pro").length}/>
+                    <StatCard label="Total Payouts"        value={fmt(payouts.filter(p=>p.status==="paid").reduce((s,p)=>s+p.amount,0))}/>
+                  </div>
+                  {pending.length > 0 && (
+                    <div style={{ ...css.card, border:`1px solid ${OR}30` }}>
+                      <h3 style={{ margin:"0 0 16px", color:OR }}>⏳ Releases Awaiting Approval ({pending.length})</h3>
+                      {pending.map(r => {
+                        const artist = users.find(u => u.id === r.user_id);
+                        return (
+                          <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                            padding:"12px 0", borderBottom:`1px solid ${BORDER}`, flexWrap:"wrap", gap:8 }}>
+                            <div>
+                              <div style={{ fontWeight:600 }}>{r.title}</div>
+                              <div style={{ color:MUTED, fontSize:13 }}>{r.type} · {r.genre} · by {artist?.name || "Unknown"}</div>
+                            </div>
+                            <div style={{ display:"flex", gap:8 }}>
+                              <button onClick={() => updateRelease(r.id, "approved")}
+                                style={{ padding:"8px 18px", background:`${G}20`, color:G,
+                                  border:`1px solid ${G}40`, borderRadius:8, cursor:"pointer", fontWeight:600, fontSize:13 }}>
+                                Approve
+                              </button>
+                              <button onClick={() => updateRelease(r.id, "rejected")}
+                                style={{ padding:"8px 18px", background:"rgba(255,23,68,0.1)", color:"#FF6B6B",
+                                  border:"1px solid rgba(255,23,68,0.3)", borderRadius:8, cursor:"pointer", fontWeight:600, fontSize:13 }}>
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {tab === "pending" && (
+            <div>
+              <h2 style={{ marginBottom:24 }}>Pending Release Reviews</h2>
+              {loading ? <div style={{ color:MUTED }}>Loading...</div>
+                : pending.length === 0
+                  ? <div style={{ ...css.card, textAlign:"center", padding:"48px 0", color:MUTED }}>No pending releases 🎉</div>
+                  : pending.map(r => {
+                      const artist = users.find(u => u.id === r.user_id);
+                      return (
+                        <div key={r.id} style={{ ...css.card, marginBottom:12 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+                            <div>
+                              <div style={{ fontWeight:700, fontSize:17 }}>{r.title}</div>
+                              <div style={{ color:MUTED, fontSize:14, marginBottom:8 }}>{r.type} · {r.genre}</div>
+                              <div style={{ fontSize:13, color:MUTED }}>Artist: <span style={{ color:WHITE }}>{artist?.name || "Unknown"}</span> · Submitted: {new Date(r.created_at).toLocaleDateString()}</div>
+                              {r.audio_url && <a href={r.audio_url} target="_blank" rel="noreferrer" style={{ color:BL, fontSize:13, display:"block", marginTop:6 }}>🎵 Listen to audio</a>}
+                              {r.cover_url && <a href={r.cover_url} target="_blank" rel="noreferrer" style={{ color:BL, fontSize:13, display:"block", marginTop:4 }}>🖼️ View cover art</a>}
+                            </div>
+                            <div style={{ display:"flex", gap:8, alignItems:"flex-start" }}>
+                              <button onClick={() => updateRelease(r.id, "approved")}
+                                style={{ padding:"10px 20px", background:`${G}20`, color:G,
+                                  border:`1px solid ${G}40`, borderRadius:8, cursor:"pointer", fontWeight:700 }}>
+                                ✓ Approve
+                              </button>
+                              <button onClick={() => updateRelease(r.id, "rejected")}
+                                style={{ padding:"10px 20px", background:"rgba(255,23,68,0.1)", color:"#FF6B6B",
+                                  border:"1px solid rgba(255,23,68,0.3)", borderRadius:8, cursor:"pointer", fontWeight:700 }}>
+                                ✕ Reject
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+              }
+            </div>
+          )}
+
+          {tab === "releases" && (
+            <div>
+              <h2 style={{ marginBottom:24 }}>All Releases ({releases.length})</h2>
+              {loading ? <div style={{ color:MUTED }}>Loading...</div>
+                : releases.map(r => {
+                    const artist = users.find(u => u.id === r.user_id);
+                    return (
+                      <div key={r.id} style={{ ...css.card, marginBottom:10, display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:8 }}>
+                        <div>
+                          <div style={{ fontWeight:600 }}>{r.title}</div>
+                          <div style={{ color:MUTED, fontSize:13 }}>{r.type} · {r.genre} · {artist?.name || "Unknown"} · {new Date(r.created_at).toLocaleDateString()}</div>
+                        </div>
+                        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                          <div style={{ ...css.tag,
+                            background:`${(STATUS_MAP[r.status]||{color:MUTED}).color}15`,
+                            color:(STATUS_MAP[r.status]||{color:MUTED}).color,
+                            border:`1px solid ${(STATUS_MAP[r.status]||{color:MUTED}).color}30` }}>
+                            {(STATUS_MAP[r.status]||{label:r.status}).label}
+                          </div>
+                          <span style={{ color:G, fontWeight:600 }}>{fmt(r.earnings)}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+              }
+            </div>
+          )}
+
+          {tab === "artists" && (
+            <div>
+              <h2 style={{ marginBottom:24 }}>All Artists ({users.filter(u=>u.role==="artist").length})</h2>
+              {loading ? <div style={{ color:MUTED }}>Loading...</div>
+                : users.filter(u=>u.role==="artist").map(u => {
+                    const uRels = releases.filter(r => r.user_id === u.id);
+                    const uEarn = uRels.reduce((s,r)=>s+(r.earnings||0),0);
+                    return (
+                      <div key={u.id} style={{ ...css.card, marginBottom:10, display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:8 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                          <div style={{ width:40, height:40, borderRadius:"50%", background:`${G}20`,
+                            display:"flex", alignItems:"center", justifyContent:"center",
+                            fontWeight:700, color:G }}>{u.av || initials(u.name)}</div>
+                          <div>
+                            <div style={{ fontWeight:600 }}>{u.name}</div>
+                            <div style={{ color:MUTED, fontSize:13 }}>{u.email} · Joined {new Date(u.created_at||Date.now()).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                        <div style={{ display:"flex", gap:16, alignItems:"center" }}>
+                          <span style={{ ...css.tag, background:`${u.plan==="Pro"?OR:G}15`, color:u.plan==="Pro"?OR:G, border:`1px solid ${u.plan==="Pro"?OR:G}30` }}>{u.plan}</span>
+                          <span style={{ color:MUTED, fontSize:13 }}>{uRels.length} releases</span>
+                          <span style={{ color:G, fontWeight:600 }}>{fmt(uEarn)}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+              }
+            </div>
+          )}
+
+          {tab === "payouts" && (
+            <div>
+              <h2 style={{ marginBottom:24 }}>Payout Requests</h2>
+              {loading ? <div style={{ color:MUTED }}>Loading...</div>
+                : payouts.length === 0
+                  ? <div style={{ ...css.card, textAlign:"center", padding:"48px 0", color:MUTED }}>No payout requests yet</div>
+                  : payouts.map(p => {
+                      const artist = users.find(u => u.id === p.user_id);
+                      return (
+                        <div key={p.id} style={{ ...css.card, marginBottom:10 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+                            <div>
+                              <div style={{ fontWeight:700, fontSize:17, color:G }}>{fmt(p.amount)}</div>
+                              <div style={{ color:MUTED, fontSize:13 }}>
+                                {artist?.name || "Unknown"} · {p.method === "bank"
+                                  ? `Bank: ${p.bank_name} · ${p.account_number}`
+                                  : `Mobile: ${p.phone}`
+                                } · {new Date(p.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                            {p.status === "pending"
+                              ? <div style={{ display:"flex", gap:8 }}>
+                                  <button onClick={() => updatePayout(p.id, "paid")}
+                                    style={{ padding:"9px 18px", background:`${G}20`, color:G,
+                                      border:`1px solid ${G}40`, borderRadius:8, cursor:"pointer", fontWeight:600 }}>
+                                    Mark Paid
+                                  </button>
+                                  <button onClick={() => updatePayout(p.id, "rejected")}
+                                    style={{ padding:"9px 18px", background:"rgba(255,23,68,0.1)", color:"#FF6B6B",
+                                      border:"1px solid rgba(255,23,68,0.3)", borderRadius:8, cursor:"pointer", fontWeight:600 }}>
+                                    Reject
+                                  </button>
+                                </div>
+                              : <div style={{ ...css.tag,
+                                  background: p.status==="paid" ? `${G}15` : "rgba(255,23,68,0.1)",
+                                  color: p.status==="paid" ? G : "#FF6B6B",
+                                  border:`1px solid ${p.status==="paid" ? G : "#FF1744"}30` }}>
+                                  {p.status === "paid" ? "✓ Paid" : "✕ Rejected"}
+                                </div>
+                            }
+                          </div>
+                        </div>
+                      );
+                    })
+              }
+            </div>
+          )}
+
+          {tab === "promos" && (
+            <div>
+              <h2 style={{ marginBottom:24 }}>Promotion Requests</h2>
+              {loading ? <div style={{ color:MUTED }}>Loading...</div>
+                : promos.length === 0
+                  ? <div style={{ ...css.card, textAlign:"center", padding:"48px 0", color:MUTED }}>No promo requests yet</div>
+                  : promos.map(p => {
+                      return (
+                        <div key={p.id} style={{ ...css.card, marginBottom:10 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:12, marginBottom:10 }}>
+                            <div>
+                              <div style={{ fontWeight:600 }}>{p.artist_name}</div>
+                              <div style={{ color:MUTED, fontSize:13 }}>{new Date(p.created_at).toLocaleDateString()}</div>
+                            </div>
+                            <div style={{ ...css.tag,
+                              background: p.status==="done" ? `${G}15` : `${OR}15`,
+                              color: p.status==="done" ? G : OR,
+                              border:`1px solid ${p.status==="done" ? G : OR}30` }}>
+                              {p.status === "done" ? "Completed" : "Pending"}
+                            </div>
+                          </div>
+                          <div style={{ background:"rgba(255,255,255,0.03)", borderRadius:8, padding:"12px 14px", fontSize:14, color:MUTED, lineHeight:1.6 }}>
+                            {p.message}
+                          </div>
+                          {p.status === "pending" && (
+                            <button onClick={async()=>{await supabase.from("promo_requests").update({status:"done"}).eq("id",p.id);fetchAll();}}
+                              style={{ marginTop:10, padding:"8px 18px", background:`${G}18`, color:G,
+                                border:`1px solid ${G}35`, borderRadius:8, cursor:"pointer", fontWeight:600, fontSize:13 }}>
+                              Mark as Done
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+              }
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── ROOT APP ──────────────────────────────────────────────────────────────────
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    // Check if already logged in
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
+        if (profile) {
+          setUser({
+            id:    session.user.id,
+            email: session.user.email,
+            name:  profile.name,
+            role:  profile.role,
+            plan:  profile.plan,
+            av:    profile.av || initials(profile.name),
+          });
+        }
+      }
+      setChecking(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) setUser(null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
+
+  if (checking) return (
+    <div style={{ ...css.page, display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <div style={{ textAlign:"center" }}>
+        <Logo size={36}/>
+        <div style={{ color:MUTED, marginTop:16 }}>Loading...</div>
       </div>
     </div>
   );
 
-  return(
-    <>
-      <style>{CSS}</style>
-      {isPub&&<Nav page={page} go={go}/>}
-      {page==="home"&&<Home go={go}/>}
-      {page==="careers"&&<Careers/>}
-      {page==="contact"&&<Contact/>}
-      {page==="login"&&!user&&<Login go={go} onLogin={onLogin}/>}
-      {page==="dashboard"&&user?.role==="artist"&&<ArtistDash user={user} onLogout={onLogout}/>}
-      {page==="dashboard"&&user?.role==="admin"&&<AdminDash user={user} onLogout={onLogout}/>}
-      {page==="dashboard"&&user&&!["artist","admin"].includes(user.role)&&<ArtistDash user={user} onLogout={onLogout}/>}
-      {isPub&&<Footer go={go}/>}
-    </>
-  );
+  if (!user)         return <AuthPage onLogin={setUser}/>;
+  if (user.role === "admin") return <AdminDash user={user} onLogout={handleLogout}/>;
+  return <ArtistDash user={user} onLogout={handleLogout}/>;
 }
