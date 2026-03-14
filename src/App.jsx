@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPA_URL = "https://eryeaaomkkzyyklnfaxa.supabase.co";
-const SUPA_KEY = "sb_publishable_41dhWT4sA8ber_ZnS0A51A_24w6KUUA";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyeWVhYW9ta2t6eXlrbG5mYXhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MTE0NDUsImV4cCI6MjA4ODM4NzQ0NX0.WxLQQuvWLcQLfMYJ4cqj3YM9GtHsMiRVt5Dt4IK1o5c";
 const supabase = createClient(SUPA_URL, SUPA_KEY);
 
 
@@ -10,22 +10,6 @@ const G="#00E676",BL="#29B6F6",OR="#FF6D00",
   BG="#04060C",S="#07090F",CARD="#0B0E1A",C2="#0F1221",
   W="#fff",SB="#8892A4",MT="#3D4560",
   B1="rgba(255,255,255,0.06)",B2="rgba(255,255,255,0.10)";
-
-const DB={
-  users:[
-    {id:1,email:"artist@demo.com",pass:"demo",role:"artist",name:"Nova Reyes",av:"NR",plan:"Pro",genre:"Afrobeats",country:"Lagos, NG"},
-    {id:2,email:"admin@demo.com",pass:"admin",role:"admin",name:"Admin User",av:"AU"},
-  ],
-  releases:[
-    {id:1,aId:1,title:"Midnight Frequencies",type:"Album",status:"distributed",genre:"Afrobeats",earnings:7650000,streams:182400,dists:["Spotify","Apple Music","Tidal","Boomplay","Audiomack"]},
-    {id:2,aId:1,title:"Neon Drift",type:"Single",status:"pending_review",genre:"Afropop",earnings:0,streams:0,dists:[]},
-    {id:3,aId:1,title:"Voltage EP",type:"EP",status:"in_distribution",genre:"Afrobeats",earnings:1970000,streams:47200,dists:["Spotify","Apple Music","Boomplay"]},
-  ],
-  payouts:[
-    {id:1,aId:1,amount:3000000,status:"paid",at:"Mar 1, 2024",method:"Bank Transfer"},
-    {id:2,aId:1,amount:2500000,status:"pending",at:"May 1, 2024",method:"Opay"},
-  ],
-};
 
 const SM={
   distributed:{l:"Live",c:G},
@@ -891,34 +875,18 @@ const Login=({go,onLogin})=>{
     if(!email||!pass)return;
     setLd(true);setErr("");
     try{
-      const d=await supa.auth.signInWithPassword({email,password:pass});
-      if(d.error){
-        setErr(d.error.message||"Invalid email or password.");
-        setLd(false);return;
-      }
-      const token=d.access_token;
-      const userId=d.user?.id;
-      // Get profile for role
-      let profile=await supa.auth.getProfile(userId,token);
-      // If no profile yet, use user metadata
-      if(!profile){
-        profile={
-          id:userId,
-          name:d.user?.user_metadata?.name||email.split("@")[0],
-          role:d.user?.user_metadata?.role||"artist",
-          plan:"Free",
-          avatar_initials:(d.user?.user_metadata?.name||"U").slice(0,2).toUpperCase()
-        };
-      }
-      // Store session in memory
+      const{data,error}=await supabase.auth.signInWithPassword({email,password:pass});
+      if(error){setErr(error.message||"Invalid email or password.");setLd(false);return;}
+      const user=data.user;
+      // Fetch profile from profiles table
+      const{data:profile}=await supabase.from("profiles").select("*").eq("id",user.id).single();
       const userData={
-        id:userId,
-        email:d.user?.email,
-        name:profile.name||email.split("@")[0],
-        role:profile.role||"artist",
-        plan:profile.plan||"Free",
-        av:profile.avatar_initials||(profile.name||"U").slice(0,2).toUpperCase(),
-        token
+        id:user.id,
+        email:user.email,
+        name:profile?.name||user.user_metadata?.name||email.split("@")[0],
+        role:profile?.role||"artist",
+        plan:profile?.plan||"Free",
+        av:profile?.av||(profile?.name||user.user_metadata?.name||"U").slice(0,2).toUpperCase(),
       };
       onLogin(userData);
     }catch(e){
@@ -932,11 +900,16 @@ const Login=({go,onLogin})=>{
     if(pass.length<6){setErr("Password must be at least 6 characters.");return;}
     setLd(true);setErr("");
     try{
-      const d=await supa.auth.signUp({email,password:pass,options:{data:{name}}});
-      if(d.error){setErr(d.error.message||"Could not create account.");setLd(false);return;}
-      if(d.data?.user){
-        await supa.from("profiles").upsert({
-          id:d.data.user.id,email,name,role:"artist",plan:"Free",av:name.slice(0,2).toUpperCase()
+      const{data,error}=await supabase.auth.signUp({email,password:pass,options:{data:{name}}});
+      if(error){setErr(error.message||"Could not create account.");setLd(false);return;}
+      if(data?.user){
+        await supabase.from("profiles").upsert({
+          id:data.user.id,
+          email,
+          name,
+          role:"artist",
+          plan:"Free",
+          av:name.slice(0,2).toUpperCase()
         });
       }
       setLd(false);
@@ -1075,11 +1048,23 @@ const Login=({go,onLogin})=>{
 const ArtistDash=({user,onLogout})=>{
   const[tab,setTab]=useState("overview");
   const[mob,setMob]=useState(window.innerWidth<768);
+  const[rels,setRels]=useState([]);
+  const[pays,setPays]=useState([]);
+  const[loading,setLoading]=useState(true);
   useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  const rels=DB.releases.filter(r=>r.aId===user.id);
-  const pays=DB.payouts.filter(p=>p.aId===user.id);
-  const totE=rels.reduce((s,r)=>s+r.earnings,0);
-  const totS=rels.reduce((s,r)=>s+r.streams,0);
+  useEffect(()=>{
+    const fetchData=async()=>{
+      setLoading(true);
+      const{data:relData}=await supabase.from("releases").select("*").eq("user_id",user.id).order("created_at",{ascending:false});
+      const{data:payData}=await supabase.from("payouts").select("*").eq("user_id",user.id).order("created_at",{ascending:false});
+      setRels(relData||[]);
+      setPays(payData||[]);
+      setLoading(false);
+    };
+    fetchData();
+  },[user.id]);
+  const totE=rels.reduce((s,r)=>s+(r.earnings||0),0);
+  const totS=rels.reduce((s,r)=>s+(r.streams||0),0);
   const ml=mob?0:210;
 
   const SideBtn=({id,ic,l})=>(
@@ -1293,7 +1278,24 @@ const ArtistDash=({user,onLogout})=>{
 const AdminDash=({user,onLogout})=>{
   const[tab,setTab]=useState("overview");
   const[mob,setMob]=useState(window.innerWidth<768);
+  const[adminUsers,setAdminUsers]=useState([]);
+  const[adminRels,setAdminRels]=useState([]);
+  const[adminPays,setAdminPays]=useState([]);
+  const[loading,setLoading]=useState(true);
   useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
+  useEffect(()=>{
+    const fetchAll=async()=>{
+      setLoading(true);
+      const{data:u}=await supabase.from("profiles").select("*").order("created_at",{ascending:false});
+      const{data:r}=await supabase.from("releases").select("*").order("created_at",{ascending:false});
+      const{data:p}=await supabase.from("payouts").select("*").order("created_at",{ascending:false});
+      setAdminUsers(u||[]);
+      setAdminRels(r||[]);
+      setAdminPays(p||[]);
+      setLoading(false);
+    };
+    fetchAll();
+  },[]);
   const ml=mob?0:210;
 
   return(
@@ -1344,7 +1346,7 @@ const AdminDash=({user,onLogout})=>{
               ))}
             </div>
             <div style={{fontFamily:"'Syne',sans-serif",fontSize:16,fontWeight:800,marginBottom:14}}>Pending Review</div>
-            {DB.releases.filter(r=>r.status==="pending_review").map(r=>(
+            {(adminRels||[]).filter(r=>r.status==="pending_review").map(r=>(
               <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"14px 18px",display:"flex",alignItems:"center",gap:14,marginBottom:10,flexWrap:"wrap"}}>
                 <div style={{width:44,height:44,borderRadius:12,background:`linear-gradient(135deg,${G}18,${BL}10)`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🎵</div>
                 <div style={{flex:1,minWidth:0}}>
@@ -1366,7 +1368,7 @@ const AdminDash=({user,onLogout})=>{
               <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>All Releases</h2>
             </div>
             <div className="fu d1" style={{display:"flex",flexDirection:"column",gap:10}}>
-              {DB.releases.map(r=>(
+              {(adminRels||[]).map(r=>(
                 <div key={r.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"15px 18px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:5,flexWrap:"wrap"}}>
@@ -1392,8 +1394,8 @@ const AdminDash=({user,onLogout})=>{
               <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>Artists</h2>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12}}>
-              {DB.users.filter(u=>u.role==="artist").map(u=>{
-                const uR=DB.releases.filter(r=>r.aId===u.id);
+              {(adminUsers||[]).filter(u=>u.role==="artist").map(u=>{
+                const uR=(adminRels||[]).filter(r=>r.user_id===u.id);
                 return(
                   <div key={u.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:18,padding:20}}>
                     <div style={{display:"flex",alignItems:"center",gap:13,marginBottom:16}}>
@@ -1427,7 +1429,7 @@ const AdminDash=({user,onLogout})=>{
               <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(20px,3vw,28px)",fontWeight:900,letterSpacing:"-.8px"}}>Payout Requests</h2>
             </div>
             <div className="fu d1" style={{display:"flex",flexDirection:"column",gap:10}}>
-              {DB.payouts.map(p=>(
+              {(adminPays||[]).map(p=>(
                 <div key={p.id} className="hover-glow" style={{background:CARD,border:`1px solid ${B1}`,borderRadius:14,padding:"14px 18px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:15,fontWeight:700,marginBottom:3}}>{fmt(p.amount)}</div>
