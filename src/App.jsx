@@ -46,6 +46,7 @@ const I={
   Twitter: ()=><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>,
   Edit:    ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
   Star:    ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>,
+  Bell:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>,
   Briefcase:()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="12"/></svg>,
 };
 
@@ -441,6 +442,7 @@ const ArtistDash=({user,onLogout})=>{
         <Logo size={22}/>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <Badge c={user.plan==="Pro"?OR:G}>{user.plan==="Pro"?"PRO":"FREE"}</Badge>
+          <NotificationBell userId={user.id}/>
           <div style={{width:34,height:34,borderRadius:"50%",background:`linear-gradient(135deg,${G}30,${BL}20)`,
             border:`1px solid ${G}35`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:13,color:G}}>{user.av}</div>
           <button onClick={onLogout} style={{display:"flex",alignItems:"center",gap:6,
@@ -886,7 +888,18 @@ const AdminDash=({user,onLogout})=>{
     setUsers(u||[]);setReleases(r||[]);setPayouts(p||[]);setPromos(pr||[]);setLoading(false);
   };
 
-  const updateRelease=async(id,fields)=>{await supabase.from("releases").update(fields).eq("id",id);fetchAll();};
+  const sendNotification=async(userId,type,message)=>{
+    await supabase.from("notifications").insert({
+      user_id:userId,type,message,read:false,
+      created_at:new Date().toISOString()
+    });
+  };
+
+  const updateRelease=async(id,fields,userId,notifType,notifMsg)=>{
+    await supabase.from("releases").update(fields).eq("id",id);
+    if(userId&&notifMsg)await sendNotification(userId,notifType,notifMsg);
+    fetchAll();
+  };
   const updatePayout=async(id,status)=>{await supabase.from("payouts").update({status}).eq("id",id);fetchAll();};
   const updatePromo=async(id,status)=>{await supabase.from("promo_requests").update({status}).eq("id",id);fetchAll();};
 
@@ -984,8 +997,8 @@ const AdminDash=({user,onLogout})=>{
                             </div>
                           </div>
                           <div style={{display:"flex",gap:8}}>
-                            <button onClick={()=>updateRelease(r.id,{status:"approved"})} style={{padding:"8px 16px",background:`${G}18`,color:G,border:`1px solid ${G}35`,borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>Approve</button>
-                            <button onClick={()=>updateRelease(r.id,{status:"rejected"})} style={{padding:"8px 16px",background:`${RED}10`,color:"#FF6B6B",border:`1px solid ${RED}25`,borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>Reject</button>
+                            <button onClick={()=>updateRelease(r.id,{status:"approved"},r.user_id,"approved",`Your release "${r.title}" has been approved and is being prepared for distribution.`)} style={{padding:"8px 16px",background:`${G}18`,color:G,border:`1px solid ${G}35`,borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>Approve</button>
+                            <button onClick={()=>updateRelease(r.id,{status:"rejected"},r.user_id,"rejected",`Your release "${r.title}" was not approved. Please contact support for more information.`)} style={{padding:"8px 16px",background:`${RED}10`,color:"#FF6B6B",border:`1px solid ${RED}25`,borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13}}>Reject</button>
                           </div>
                         </div>
                       );
@@ -1019,9 +1032,9 @@ const AdminDash=({user,onLogout})=>{
                           </div>
                         </div>
                         <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                          <button onClick={()=>updateRelease(r.id,{status:"approved"})} style={{padding:"10px 20px",background:`${G}18`,color:G,border:`1px solid ${G}35`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>✓ Approve</button>
-                          <button onClick={()=>updateRelease(r.id,{status:"distributed"})} style={{padding:"10px 20px",background:`${BL}12`,color:BL,border:`1px solid ${BL}30`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Mark Live</button>
-                          <button onClick={()=>updateRelease(r.id,{status:"rejected"})} style={{padding:"10px 20px",background:`${RED}10`,color:"#FF6B6B",border:`1px solid ${RED}25`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>✕ Reject</button>
+                          <button onClick={()=>updateRelease(r.id,{status:"approved"},r.user_id,"approved",`Your release "${r.title}" has been approved and is being prepared for distribution.`)} style={{padding:"10px 20px",background:`${G}18`,color:G,border:`1px solid ${G}35`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>✓ Approve</button>
+                          <button onClick={()=>updateRelease(r.id,{status:"distributed"},r.user_id,"distributed",`Your release "${r.title}" is now LIVE on Spotify, Apple Music, Boomplay and all platforms. Start sharing! 🎉`)} style={{padding:"10px 20px",background:`${BL}12`,color:BL,border:`1px solid ${BL}30`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Mark Live</button>
+                          <button onClick={()=>updateRelease(r.id,{status:"rejected"},r.user_id,"rejected",`Your release "${r.title}" was not approved. Please contact support for more information.`)} style={{padding:"10px 20px",background:`${RED}10`,color:"#FF6B6B",border:`1px solid ${RED}25`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>✕ Reject</button>
                         </div>
                       </div>
                     </div>
@@ -1111,8 +1124,8 @@ const AdminDash=({user,onLogout})=>{
                         </div>
                         {p.status==="pending"
                           ?<div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                              <button onClick={()=>updatePayout(p.id,"paid")} style={{padding:"9px 18px",background:`${G}18`,color:G,border:`1px solid ${G}35`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Mark Paid</button>
-                              <button onClick={()=>updatePayout(p.id,"rejected")} style={{padding:"9px 18px",background:`${RED}10`,color:"#FF6B6B",border:`1px solid ${RED}25`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Reject</button>
+                              <button onClick={async()=>{await supabase.from("payouts").update({status:"paid"}).eq("id",p.id);await sendNotification(p.user_id,"payout_paid",`Your payout of ${fmt(p.amount)} has been processed and sent to your account.`);fetchAll();}} style={{padding:"9px 18px",background:`${G}18`,color:G,border:`1px solid ${G}35`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Mark Paid</button>
+                              <button onClick={async()=>{await supabase.from("payouts").update({status:"rejected"}).eq("id",p.id);await sendNotification(p.user_id,"payout_rejected",`Your payout request of ${fmt(p.amount)} was rejected. Please contact support.`);fetchAll();}} style={{padding:"9px 18px",background:`${RED}10`,color:"#FF6B6B",border:`1px solid ${RED}25`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Reject</button>
                             </div>
                           :<Badge c={p.status==="paid"?G:RED}>{p.status==="paid"?"✓ Paid":"✕ Rejected"}</Badge>
                         }
@@ -1203,6 +1216,10 @@ const AdminDash=({user,onLogout})=>{
                   </div>
                 ))
               }
+            </div>
+            <div style={{marginTop:16}}>
+              <div style={{fontSize:11,fontWeight:700,color:MUTED,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Send Message to All Artists</div>
+              <MessageAllArtists users={users} sendNotification={sendNotification}/>
             </div>
             <div style={{marginTop:16,padding:"14px",background:`${BL}08`,border:`1px solid ${BL}20`,borderRadius:10,fontSize:12,color:MUTED,lineHeight:1.6}}>
               <strong style={{color:BL}}>Team Admin permissions:</strong> Can update release status, earnings, streams, DSPs · Process and approve payouts · View all artist info · Cannot manage team or delete data.
