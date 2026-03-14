@@ -1631,10 +1631,18 @@ export default function App(){
   };
 
   useEffect(()=>{
+    // Safety timeout — never show loading screen more than 4 seconds
+    const timeout=setTimeout(()=>setChecking(false),4000);
+
     // Check existing session on load
     supabase.auth.getSession().then(({data:{session}})=>{
+      clearTimeout(timeout);
       loadProfile(session?.user||null);
+    }).catch(()=>{
+      clearTimeout(timeout);
+      setChecking(false);
     });
+
     // Listen for auth changes (sign in / sign out)
     const{data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
       if(event==="SIGNED_OUT"||!session){
@@ -1643,7 +1651,7 @@ export default function App(){
         await loadProfile(session.user);
       }
     });
-    return()=>subscription.unsubscribe();
+    return()=>{subscription.unsubscribe();clearTimeout(timeout);};
   },[]);
 
   const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setPage("home");};
