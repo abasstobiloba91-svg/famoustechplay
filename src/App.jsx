@@ -246,15 +246,20 @@ const AuthPage=({onLogin,onBack})=>{
     if(!name.trim()||!email.trim()||!pass){setErr("Please fill all fields.");return;}
     if(pass.length<6){setErr("Password must be at least 6 characters.");return;}
     setBusy(true);
-    const{data,error}=await supabase.auth.signUp({email:email.trim(),password:pass,options:{data:{name:name.trim()}}});
-    if(error){setErr(error.message);setBusy(false);return;}
-    if(data.user){
-      const{error:pe}=await supabase.from("profiles").upsert({
-        id:data.user.id,email:email.trim(),name:name.trim(),
-        role:"artist",plan:"Free",av:ini(name),created_at:new Date().toISOString()
-      });
-      if(pe){setErr("Profile error: "+pe.message);setBusy(false);return;}
-      setMsg("Account created! You can now sign in.");setMode("signin");
+    try{
+      const authPromise=supabase.auth.signUp({email:email.trim(),password:pass,options:{data:{name:name.trim()}}});
+      const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error("Connection timed out. Please check your internet and try again.")),10000));
+      const{data,error}=await Promise.race([authPromise,timeout]);
+      if(error){setErr(error.message);setBusy(false);return;}
+      if(data.user){
+        await supabase.from("profiles").upsert({
+          id:data.user.id,email:email.trim(),name:name.trim(),
+          role:"artist",plan:"Free",av:ini(name),created_at:new Date().toISOString()
+        });
+        setMsg("Account created! You can now sign in.");setMode("signin");
+      }
+    }catch(e){
+      setErr(e.message||"Connection failed. Please try again.");
     }
     setBusy(false);
   };
@@ -263,12 +268,27 @@ const AuthPage=({onLogin,onBack})=>{
     setErr("");setMsg("");
     if(!email.trim()||!pass){setErr("Please enter your email and password.");return;}
     setBusy(true);
-    const{data,error}=await supabase.auth.signInWithPassword({email:email.trim(),password:pass});
-    if(error){setErr(error.message);setBusy(false);return;}
-    const{data:p}=await supabase.from("profiles").select("*").eq("id",data.user.id).single();
-    onLogin({id:data.user.id,email:data.user.email,
-      name:p?.name||data.user.user_metadata?.name||email.split("@")[0],
-      role:p?.role||"artist",plan:p?.plan||"Free",av:p?.av||ini(p?.name||email)});
+    try{
+      // Race auth against 10s timeout
+      const authPromise=supabase.auth.signInWithPassword({email:email.trim(),password:pass});
+      const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error("Connection timed out. Please check your internet and try again.")),10000));
+      const{data,error}=await Promise.race([authPromise,timeout]);
+      if(error){setErr(error.message);setBusy(false);return;}
+      // Fetch profile with 5s timeout
+      const profilePromise=supabase.from("profiles").select("*").eq("id",data.user.id).single();
+      const profileTimeout=new Promise(res=>setTimeout(()=>res({data:null}),5000));
+      const{data:p}=await Promise.race([profilePromise,profileTimeout]);
+      onLogin({
+        id:data.user.id,
+        email:data.user.email,
+        name:p?.name||data.user.user_metadata?.name||email.split("@")[0],
+        role:p?.role||"artist",
+        plan:p?.plan||"Free",
+        av:p?.av||ini(p?.name||email)
+      });
+    }catch(e){
+      setErr(e.message||"Connection failed. Please try again.");
+    }
     setBusy(false);
   };
 
