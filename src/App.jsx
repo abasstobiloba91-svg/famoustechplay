@@ -890,7 +890,7 @@ const Login=({go,onLogin})=>{
       };
       onLogin(userData);
     }catch(e){
-      setErr("Connection error. Please check your internet and try again.");
+      setErr(e?.message||JSON.stringify(e)||"Connection error. Please try again.");
       setLd(false);
     }
   };
@@ -903,7 +903,7 @@ const Login=({go,onLogin})=>{
       const{data,error}=await supabase.auth.signUp({email,password:pass,options:{data:{name}}});
       if(error){setErr(error.message||"Could not create account.");setLd(false);return;}
       if(data?.user){
-        await supabase.from("profiles").upsert({
+        const{error:profErr}=await supabase.from("profiles").upsert({
           id:data.user.id,
           email,
           name,
@@ -911,12 +911,13 @@ const Login=({go,onLogin})=>{
           plan:"Free",
           av:name.slice(0,2).toUpperCase()
         });
+        if(profErr){setErr("Account created but profile failed: "+profErr.message);setLd(false);return;}
       }
       setLd(false);
       setMsg("✅ Account created! You can now sign in.");
       setMode("signin");
     }catch(e){
-      setErr("Connection error. Please try again.");
+      setErr(e?.message||JSON.stringify(e)||"Connection error. Please try again.");
       setLd(false);
     }
   };
