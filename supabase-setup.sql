@@ -1,71 +1,83 @@
--- Supabase Setup for FamousTechPlay
+-- FamousTechPlay Database Setup
+-- Run this in Supabase SQL Editor
 
--- Enable Row Level Security
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE releases ENABLE ROW LEVEL SECURITY;
-ALTER TABLE payouts ENABLE ROW LEVEL SECURITY;
-
--- Users table
-CREATE TABLE users (
-  id UUID REFERENCES auth.users(id) PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('artist', 'admin')),
+-- Profiles table
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  email TEXT NOT NULL,
   name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'artist' CHECK (role IN ('artist','admin')),
+  plan TEXT NOT NULL DEFAULT 'Free' CHECK (plan IN ('Free','Pro')),
   av TEXT,
-  plan TEXT DEFAULT 'Free',
-  genre TEXT,
-  country TEXT
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Releases table
-CREATE TABLE releases (
-  id SERIAL PRIMARY KEY,
-  aId UUID REFERENCES users(id),
+CREATE TABLE IF NOT EXISTS releases (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  type TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending_review',
+  type TEXT DEFAULT 'Single',
   genre TEXT,
-  earnings INTEGER DEFAULT 0,
-  streams INTEGER DEFAULT 0,
-  dists JSONB DEFAULT '[]',
-  file_url TEXT
+  status TEXT DEFAULT 'pending_review' CHECK (status IN ('pending_review','approved','distributed','rejected')),
+  earnings NUMERIC DEFAULT 0,
+  streams BIGINT DEFAULT 0,
+  audio_url TEXT,
+  cover_url TEXT,
+  dsps TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Payouts table
-CREATE TABLE payouts (
-  id SERIAL PRIMARY KEY,
-  aId UUID REFERENCES users(id),
-  amount INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending',
-  at TEXT NOT NULL,
-  method TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS payouts (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  amount NUMERIC NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending','paid','rejected')),
+  method TEXT DEFAULT 'bank',
+  bank_name TEXT,
+  account_number TEXT,
+  phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create storage bucket for music files
-INSERT INTO storage.buckets (id, name, public) VALUES ('music-files', 'music-files', false);
+-- Promo requests table
+CREATE TABLE IF NOT EXISTS promo_requests (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  artist_name TEXT,
+  message TEXT,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending','done')),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
--- Storage policies
-CREATE POLICY "Artists can upload own files" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'music-files' AND auth.uid()::text = (storage.foldername(name))[1]);
-CREATE POLICY "Artists can view own files" ON storage.objects FOR SELECT USING (bucket_id = 'music-files' AND auth.uid()::text = (storage.foldername(name))[1]);
-CREATE POLICY "Artists can update own files" ON storage.objects FOR UPDATE USING (bucket_id = 'music-files' AND auth.uid()::text = (storage.foldername(name))[1]);
-CREATE POLICY "Artists can delete own files" ON storage.objects FOR DELETE USING (bucket_id = 'music-files' AND auth.uid()::text = (storage.foldername(name))[1]);
+-- Storage buckets (run separately in Supabase dashboard if needed)
+-- Create buckets: "music" and "covers" in Storage
 
--- Policies for users
-CREATE POLICY "Users can view own profile" ON users FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON users FOR UPDATE USING (auth.uid() = id);
+-- Row Level Security
+ALTER TABLE profiles      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE releases      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payouts       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE promo_requests ENABLE ROW LEVEL SECURITY;
 
--- Policies for releases
-CREATE POLICY "Artists can view own releases" ON releases FOR SELECT USING (auth.uid() = aId);
-CREATE POLICY "Artists can insert own releases" ON releases FOR INSERT WITH CHECK (auth.uid() = aId);
-CREATE POLICY "Artists can update own releases" ON releases FOR UPDATE USING (auth.uid() = aId);
+-- Drop old policies if they exist
+DROP POLICY IF EXISTS "profiles_select"  ON profiles;
+DROP POLICY IF EXISTS "profiles_insert"  ON profiles;
+DROP POLICY IF EXISTS "profiles_update"  ON profiles;
+DROP POLICY IF EXISTS "releases_all"     ON releases;
+DROP POLICY IF EXISTS "payouts_all"      ON payouts;
+DROP POLICY IF EXISTS "promos_all"       ON promo_requests;
 
--- Policies for payouts
-CREATE POLICY "Artists can view own payouts" ON payouts FOR SELECT USING (auth.uid() = aId);
-CREATE POLICY "Artists can insert own payouts" ON payouts FOR INSERT WITH CHECK (auth.uid() = aId);
+-- Profiles: users can read/write own, admin can read all
+CREATE POLICY "profiles_insert" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (auth.uid() = id OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY "profiles_update" ON profiles FOR UPDATE USING (auth.uid() = id);
 
--- For admin, allow all
-CREATE POLICY "Admins can view all users" ON users FOR SELECT USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
-CREATE POLICY "Admins can view all releases" ON releases FOR SELECT USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
-CREATE POLICY "Admins can update releases" ON releases FOR UPDATE USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
-CREATE POLICY "Admins can view all payouts" ON payouts FOR SELECT USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
-CREATE POLICY "Admins can update payouts" ON payouts FOR UPDATE USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
+-- Releases: users manage own, admin manages all
+CREATE POLICY "releases_all" ON releases FOR ALL USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+-- Payouts: users manage own, admin manages all
+CREATE POLICY "payouts_all" ON payouts FOR ALL USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+-- Promo requests: users manage own, admin manages all
+CREATE POLICY "promos_all" ON promo_requests FOR ALL USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
