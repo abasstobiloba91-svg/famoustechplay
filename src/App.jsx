@@ -129,6 +129,112 @@ const UploadStep=({step,current,label})=>{
 
 
 
+// ── NOTIFICATION BELL ────────────────────────────────────────────────────────
+const NotificationBell=({userId})=>{
+  const[notifs,setNotifs]=useState([]);
+  const[open,setOpen]=useState(false);
+  const ref=useRef(null);
+
+  useEffect(()=>{
+    fetchN();
+    const sub=supabase.channel("notifs_"+userId)
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications",filter:`user_id=eq.${userId}`},
+        p=>{setNotifs(prev=>[p.new,...prev]);})
+      .subscribe();
+    return()=>sub.unsubscribe();
+  },[userId]);
+
+  useEffect(()=>{
+    const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
+    document.addEventListener("mousedown",h);
+    return()=>document.removeEventListener("mousedown",h);
+  },[]);
+
+  const fetchN=async()=>{
+    const{data}=await supabase.from("notifications").select("*")
+      .eq("user_id",userId).order("created_at",{ascending:false}).limit(25);
+    setNotifs(data||[]);
+  };
+
+  const markRead=async id=>{
+    await supabase.from("notifications").update({read:true}).eq("id",id);
+    setNotifs(prev=>prev.map(n=>n.id===id?{...n,read:true}:n));
+  };
+
+  const markAll=async()=>{
+    await supabase.from("notifications").update({read:true}).eq("user_id",userId).eq("read",false);
+    setNotifs(prev=>prev.map(n=>({...n,read:true})));
+  };
+
+  const unread=notifs.filter(n=>!n.read).length;
+  const tColor={approved:G,rejected:RED,distributed:G,payout_paid:G,payout_rejected:RED,message:BL};
+
+  return(
+    <div ref={ref} style={{position:"relative"}}>
+      <button onClick={()=>setOpen(!open)}
+        style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",
+          width:36,height:36,background:open?`${G}12`:"transparent",
+          border:`1px solid ${open?G:BORDER}`,borderRadius:8,
+          color:unread>0?G:MUTED,cursor:"pointer",transition:"all .15s"}}>
+        <I.Bell/>
+        {unread>0&&(
+          <span style={{position:"absolute",top:-5,right:-5,minWidth:18,height:18,
+            background:RED,borderRadius:9,display:"flex",alignItems:"center",
+            justifyContent:"center",fontSize:10,fontWeight:800,color:WHITE,
+            border:`2px solid ${BG}`,padding:"0 4px"}}>
+            {unread>9?"9+":unread}
+          </span>
+        )}
+      </button>
+      {open&&(
+        <div style={{position:"absolute",top:46,right:0,width:340,maxHeight:460,
+          background:CARD,border:`1px solid ${BORDER2}`,borderRadius:16,
+          boxShadow:"0 24px 64px rgba(0,0,0,0.7)",zIndex:500,
+          display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+            padding:"14px 16px",borderBottom:`1px solid ${BORDER}`,flexShrink:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontWeight:700,fontSize:15}}>Notifications</span>
+              {unread>0&&<Badge c={RED}>{unread} new</Badge>}
+            </div>
+            {unread>0&&<button onClick={markAll}
+              style={{background:"none",border:"none",color:G,cursor:"pointer",fontSize:12,fontWeight:600}}>
+              Mark all read
+            </button>}
+          </div>
+          <div style={{overflowY:"auto",flex:1}}>
+            {notifs.length===0
+              ?<div style={{padding:"40px 16px",textAlign:"center"}}>
+                  <div style={{fontSize:32,marginBottom:12}}>🔔</div>
+                  <div style={{color:MUTED,fontSize:14}}>No notifications yet</div>
+                  <div style={{color:MUTED,fontSize:12,marginTop:4}}>We'll notify you about your releases and payouts</div>
+                </div>
+              :notifs.map(n=>(
+                <div key={n.id} onClick={()=>markRead(n.id)}
+                  style={{padding:"14px 16px",borderBottom:`1px solid ${BORDER}`,cursor:"pointer",
+                    background:n.read?"transparent":`${G}04`,
+                    display:"flex",gap:12,alignItems:"flex-start"}}>
+                  <div style={{width:10,height:10,borderRadius:"50%",flexShrink:0,marginTop:4,
+                    background:n.read?MUTED:(tColor[n.type]||G),
+                    boxShadow:n.read?"none":`0 0 6px ${tColor[n.type]||G}`}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:n.read?400:600,lineHeight:1.55,color:n.read?MUTED2:WHITE}}>{n.message}</div>
+                    <div style={{fontSize:11,color:MUTED,marginTop:4}}>{ago(n.created_at)}</div>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+          <div style={{padding:"10px 14px",borderTop:`1px solid ${BORDER}`,flexShrink:0,
+            fontSize:11,color:MUTED,textAlign:"center"}}>
+            Notifications are cleared after 30 days
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 const AuthPage=({onLogin,onBack})=>{
   const[mode,setMode]=useState("signin");
@@ -841,6 +947,39 @@ const ArtistDash=({user,onLogout})=>{
   );
 };
 
+// ── MESSAGE ALL ARTISTS ──────────────────────────────────────────────────────
+const MessageAllArtists=({users,sendNotification})=>{
+  const[msg,setMsg]=useState("");
+  const[busy,setBusy]=useState(false);
+  const[sent,setSent]=useState(false);
+
+  const send=async()=>{
+    if(!msg.trim())return;
+    setBusy(true);
+    const artists=users.filter(u=>u.role==="artist"||u.role==="team_admin");
+    await Promise.all(artists.map(u=>sendNotification(u.id,"message",msg.trim(),{message:msg.trim()})));
+    setMsg("");setSent(true);setBusy(false);
+    setTimeout(()=>setSent(false),3000);
+  };
+
+  return(
+    <div>
+      {sent&&<Suc msg="Message sent to all artists!"/>}
+      <div style={{display:"flex",gap:8}}>
+        <input style={{...inp,flex:1,fontSize:13}} placeholder="Type a message to all artists..."
+          value={msg} onChange={e=>setMsg(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&send()}/>
+        <button onClick={send} disabled={busy||!msg.trim()}
+          style={{padding:"11px 18px",background:BL,color:"#000",border:"none",
+            borderRadius:9,fontWeight:700,cursor:"pointer",
+            opacity:busy||!msg.trim()?0.5:1,whiteSpace:"nowrap",fontSize:13}}>
+          {busy?"Sending...":"Send"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ── ADMIN DASHBOARD ───────────────────────────────────────────────────────────
 const AdminDash=({user,onLogout})=>{
   const[tab,setTab]=useState("overview");
@@ -888,16 +1027,31 @@ const AdminDash=({user,onLogout})=>{
     setUsers(u||[]);setReleases(r||[]);setPayouts(p||[]);setPromos(pr||[]);setLoading(false);
   };
 
-  const sendNotification=async(userId,type,message)=>{
+  const sendNotification=async(userId,type,message,emailData={})=>{
+    // 1. In-app notification
     await supabase.from("notifications").insert({
       user_id:userId,type,message,read:false,
       created_at:new Date().toISOString()
     });
+    // 2. Email notification
+    try{
+      const artist=users.find(u=>u.id===userId);
+      if(artist?.email){
+        await supabase.functions.invoke("send-notification",{
+          body:{
+            to:artist.email,
+            artistName:artist.name,
+            type,
+            ...emailData
+          }
+        });
+      }
+    }catch(e){console.warn("Email send failed:",e.message);}
   };
 
   const updateRelease=async(id,fields,userId,notifType,notifMsg)=>{
     await supabase.from("releases").update(fields).eq("id",id);
-    if(userId&&notifMsg)await sendNotification(userId,notifType,notifMsg);
+    if(userId&&notifMsg)await sendNotification(userId,notifType,notifMsg,{releaseTitle:fields.status?"":"",...(notifMsg.includes("LIVE")?{releaseTitle:releases.find(r=>r.id===id)?.title||"your release"}:{releaseTitle:releases.find(r=>r.id===id)?.title||"your release"})});
     fetchAll();
   };
   const updatePayout=async(id,status)=>{await supabase.from("payouts").update({status}).eq("id",id);fetchAll();};
@@ -1124,8 +1278,8 @@ const AdminDash=({user,onLogout})=>{
                         </div>
                         {p.status==="pending"
                           ?<div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                              <button onClick={async()=>{await supabase.from("payouts").update({status:"paid"}).eq("id",p.id);await sendNotification(p.user_id,"payout_paid",`Your payout of ${fmt(p.amount)} has been processed and sent to your account.`);fetchAll();}} style={{padding:"9px 18px",background:`${G}18`,color:G,border:`1px solid ${G}35`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Mark Paid</button>
-                              <button onClick={async()=>{await supabase.from("payouts").update({status:"rejected"}).eq("id",p.id);await sendNotification(p.user_id,"payout_rejected",`Your payout request of ${fmt(p.amount)} was rejected. Please contact support.`);fetchAll();}} style={{padding:"9px 18px",background:`${RED}10`,color:"#FF6B6B",border:`1px solid ${RED}25`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Reject</button>
+                              <button onClick={async()=>{await supabase.from("payouts").update({status:"paid"}).eq("id",p.id);await sendNotification(p.user_id,"payout_paid",`Your payout of ${fmt(p.amount)} has been processed and sent to your account.`,{amount:fmt(p.amount),bankName:p.method==="bank"?p.bank_name:"Mobile Money"});fetchAll();}} style={{padding:"9px 18px",background:`${G}18`,color:G,border:`1px solid ${G}35`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Mark Paid</button>
+                              <button onClick={async()=>{await supabase.from("payouts").update({status:"rejected"}).eq("id",p.id);await sendNotification(p.user_id,"payout_rejected",`Your payout request of ${fmt(p.amount)} was rejected. Please contact support.`,{amount:fmt(p.amount)});fetchAll();}} style={{padding:"9px 18px",background:`${RED}10`,color:"#FF6B6B",border:`1px solid ${RED}25`,borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}>Reject</button>
                             </div>
                           :<Badge c={p.status==="paid"?G:RED}>{p.status==="paid"?"✓ Paid":"✕ Rejected"}</Badge>
                         }
@@ -1453,15 +1607,42 @@ export default function App(){
   const[checking,setChecking]=useState(true);
   const[page,setPage]=useState("home");
 
-  useEffect(()=>{
-    supabase.auth.getSession().then(async({data:{session}})=>{
-      if(session?.user){
-        const{data:p}=await supabase.from("profiles").select("*").eq("id",session.user.id).single();
-        if(p)setUser({id:session.user.id,email:session.user.email,name:p.name,role:p.role,plan:p.plan,av:p.av||ini(p.name)});
+  const loadProfile=async(sessionUser)=>{
+    if(!sessionUser){setUser(null);setChecking(false);return;}
+    try{
+      const{data:p}=await supabase.from("profiles").select("*").eq("id",sessionUser.id).single();
+      if(p){
+        setUser({id:sessionUser.id,email:sessionUser.email,
+          name:p.name,role:p.role,plan:p.plan,av:p.av||ini(p.name)});
+      } else {
+        // Profile missing — create it then set user
+        const name=sessionUser.user_metadata?.name||sessionUser.email.split("@")[0];
+        await supabase.from("profiles").upsert({
+          id:sessionUser.id,email:sessionUser.email,name,
+          role:"artist",plan:"Free",av:ini(name),created_at:new Date().toISOString()
+        });
+        setUser({id:sessionUser.id,email:sessionUser.email,
+          name,role:"artist",plan:"Free",av:ini(name)});
       }
-      setChecking(false);
+    }catch(e){
+      console.error("Profile load error:",e);
+    }
+    setChecking(false);
+  };
+
+  useEffect(()=>{
+    // Check existing session on load
+    supabase.auth.getSession().then(({data:{session}})=>{
+      loadProfile(session?.user||null);
     });
-    const{data:{subscription}}=supabase.auth.onAuthStateChange((_,session)=>{if(!session)setUser(null);});
+    // Listen for auth changes (sign in / sign out)
+    const{data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
+      if(event==="SIGNED_OUT"||!session){
+        setUser(null);setChecking(false);
+      } else if(event==="SIGNED_IN"||event==="TOKEN_REFRESHED"){
+        await loadProfile(session.user);
+      }
+    });
     return()=>subscription.unsubscribe();
   },[]);
 
