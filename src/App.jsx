@@ -126,23 +126,7 @@ const UploadStep=({step,current,label})=>{
   );
 };
 
-// XHR-based upload with progress
-const uploadWithProgress=(bucket,path,file,contentType,onProgress)=>new Promise((resolve,reject)=>{
-  const url=`https://eryeaaomkkzyyklnfaxa.supabase.co/storage/v1/object/${bucket}/${path}`;
-  const xhr=new XMLHttpRequest();
-  xhr.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round((e.loaded/e.total)*100));};
-  xhr.onload=()=>{
-    if(xhr.status===200||xhr.status===201)resolve({error:null});
-    else resolve({error:{message:`Upload failed (${xhr.status}): ${xhr.responseText}`}});
-  };
-  xhr.onerror=()=>resolve({error:{message:"Network error during upload"}});
-  xhr.open("POST",url);
-  xhr.setRequestHeader("Authorization",`Bearer ${supabase.auth.session?.()?.access_token||""}`);
-  xhr.setRequestHeader("apikey","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyeWVhYW9ta2t6eXlrbG5mYXhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MTE0NDUsImV4cCI6MjA4ODM4NzQ0NX0.WxLQQuvWLcQLfMYJ4cqj3YM9GtHsMiRVt5Dt4IK1o5c");
-  xhr.setRequestHeader("Content-Type",contentType);
-  xhr.setRequestHeader("x-upsert","false");
-  xhr.send(file);
-});
+
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 const AuthPage=({onLogin,onBack})=>{
@@ -330,17 +314,17 @@ const ArtistDash=({user,onLogout})=>{
     const aPath=`${user.id}/${Date.now()}_audio.${aExt}`;
     const aCT=aExt==="wav"?"audio/wav":"audio/mpeg";
 
-    // Try XHR with progress first, fallback to supabase SDK
+    // Upload audio with XHR progress tracking
     try{
-      const xhrRes=await new Promise((resolve)=>{
+      await new Promise((resolve,reject)=>{
         const url=`https://eryeaaomkkzyyklnfaxa.supabase.co/storage/v1/object/music/${aPath}`;
         const xhr=new XMLHttpRequest();
         xhr.upload.onprogress=e=>{if(e.lengthComputable)setUAudioPct(Math.round((e.loaded/e.total)*100));};
         xhr.onload=()=>{
-          if(xhr.status===200||xhr.status===201){resolve({ok:true});}
-          else resolve({ok:false,msg:xhr.responseText});
+          if(xhr.status===200||xhr.status===201)resolve();
+          else reject(new Error(`Upload failed (${xhr.status}): ${xhr.responseText}`));
         };
-        xhr.onerror=()=>resolve({ok:false,msg:"Network error"});
+        xhr.onerror=()=>reject(new Error("Network error during audio upload"));
         xhr.open("POST",url);
         xhr.setRequestHeader("Authorization",`Bearer ${token}`);
         xhr.setRequestHeader("apikey","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyeWVhYW9ta2t6eXlrbG5mYXhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MTE0NDUsImV4cCI6MjA4ODM4NzQ0NX0.WxLQQuvWLcQLfMYJ4cqj3YM9GtHsMiRVt5Dt4IK1o5c");
@@ -348,28 +332,26 @@ const ArtistDash=({user,onLogout})=>{
         xhr.setRequestHeader("x-upsert","false");
         xhr.send(uFile);
       });
-      if(!xhrRes.ok){
-        // fallback to SDK
-        const{error:aErr}=await supabase.storage.from("music").upload(aPath,uFile,{contentType:aCT});
-        if(aErr){setUErr("Audio upload failed: "+aErr.message);setUBusy(false);setUStep(0);return;}
-      }
       setUAudioPct(100);
-    }catch(e){setUErr("Audio upload error: "+e.message);setUBusy(false);setUStep(0);return;}
+    }catch(e){setUErr("Audio upload failed: "+e.message);setUBusy(false);setUStep(0);return;}
     const{data:aUrl}=supabase.storage.from("music").getPublicUrl(aPath);
     audio_url=aUrl.publicUrl;
 
-    // Step 3: upload cover
+    // Step 3: upload cover with progress
     setUStep(3);
     const cExt=uCover.name.split(".").pop().toLowerCase();
     const cPath=`${user.id}/${Date.now()}_cover.${cExt}`;
     const cCT=`image/${cExt==="jpg"?"jpeg":cExt}`;
     try{
-      const xhrRes=await new Promise((resolve)=>{
+      await new Promise((resolve,reject)=>{
         const url=`https://eryeaaomkkzyyklnfaxa.supabase.co/storage/v1/object/covers/${cPath}`;
         const xhr=new XMLHttpRequest();
         xhr.upload.onprogress=e=>{if(e.lengthComputable)setUCoverPct(Math.round((e.loaded/e.total)*100));};
-        xhr.onload=()=>{if(xhr.status===200||xhr.status===201)resolve({ok:true});else resolve({ok:false,msg:xhr.responseText});};
-        xhr.onerror=()=>resolve({ok:false,msg:"Network error"});
+        xhr.onload=()=>{
+          if(xhr.status===200||xhr.status===201)resolve();
+          else reject(new Error(`Cover upload failed (${xhr.status}): ${xhr.responseText}`));
+        };
+        xhr.onerror=()=>reject(new Error("Network error during cover upload"));
         xhr.open("POST",url);
         xhr.setRequestHeader("Authorization",`Bearer ${token}`);
         xhr.setRequestHeader("apikey","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyeWVhYW9ta2t6eXlrbG5mYXhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MTE0NDUsImV4cCI6MjA4ODM4NzQ0NX0.WxLQQuvWLcQLfMYJ4cqj3YM9GtHsMiRVt5Dt4IK1o5c");
@@ -377,12 +359,8 @@ const ArtistDash=({user,onLogout})=>{
         xhr.setRequestHeader("x-upsert","false");
         xhr.send(uCover);
       });
-      if(!xhrRes.ok){
-        const{error:cErr}=await supabase.storage.from("covers").upload(cPath,uCover,{contentType:cCT});
-        if(cErr){setUErr("Cover upload failed: "+cErr.message);setUBusy(false);setUStep(0);return;}
-      }
       setUCoverPct(100);
-    }catch(e){setUErr("Cover upload error: "+e.message);setUBusy(false);setUStep(0);return;}
+    }catch(e){setUErr("Cover upload failed: "+e.message);setUBusy(false);setUStep(0);return;}
     const{data:cUrl}=supabase.storage.from("covers").getPublicUrl(cPath);
     cover_url=cUrl.publicUrl;
 
